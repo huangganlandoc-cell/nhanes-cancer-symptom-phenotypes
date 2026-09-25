@@ -26,7 +26,9 @@
 ##                  with Part A's code and compared with the saved nhanes_model4_covariates.csv
 ##   Part B       : step 251 (imputation + merge into the 70,190-row design frame), run from the
 ##                  saved covariates file and compared with the saved nhanes_model4_design_frame
-## Outputs: review/reproduction/output/input_checks/check_model4_mcq_conditions.csv
+## Outputs: review/reproduction/output/input_checks/check_model4_covariates_partA.csv  (Part A vs the saved
+##            covariates, cell by cell; only when Part A ran)
+##          review/reproduction/output/input_checks/check_model4_mcq_conditions.csv
 ##          review/reproduction/output/input_checks/check_model4_design_frame.csv
 ##          data/derived/nhanes_model4_covariates.csv       only if absent and Part A ran
 ##          data/derived/nhanes_model4_design_frame.csv.gz  only if absent
@@ -158,6 +160,21 @@ if (have_all) {
   M4 <- read.csv(file.path(DER, "nhanes_model4_covariates.csv"))
 }
 
+## ============== PART A vs saved covariates (only when Part A ran) ==============================
+if (have_all) {
+  SC <- read.csv(file.path(DER, "nhanes_model4_covariates.csv"))
+  stopifnot(identical(names(SC), names(M4)), nrow(SC) == nrow(M4))
+  chkP <- data.frame(column = names(SC), n_rows = nrow(SC),
+    differing_cells = sapply(names(SC), function(v) { a <- SC[[v]]; b <- M4[[v]]
+      if (is.numeric(a) && is.numeric(b)) sum(xor(is.na(a), is.na(b))) + sum(abs(a - b) > 1e-9 * pmax(1, abs(a)), na.rm = TRUE)
+      else sum(xor(is.na(a), is.na(b))) + sum(as.character(a) != as.character(b), na.rm = TRUE) }),
+    max_abs_diff = sapply(names(SC), function(v) { a <- SC[[v]]; b <- M4[[v]]
+      if (is.numeric(a) && is.numeric(b)) max(c(0, abs(a - b)), na.rm = TRUE) else NA }))
+  cat("\n=== Part A: covariates re-derived from the raw files vs saved nhanes_model4_covariates.csv ===\n")
+  print(chkP, row.names = FALSE)
+  write.csv(chkP, file.path(OUT, "input_checks", "check_model4_covariates_partA.csv"), row.names = FALSE)
+}
+
 ## ============== PART A-check: the MCQ-based conditions (MCQ is in data/raw_nhanes) ==============
 saved <- read.csv(file.path(DER, "nhanes_model4_covariates.csv"))
 mcqc <- do.call(rbind, lapply(names(CY), function(y) {
@@ -206,7 +223,8 @@ chkB <- data.frame(column = names(SV), in_rederived = names(SV) %in% names(GD),
     else sum(xor(is.na(a), is.na(b))) + sum(as.character(a) != as.character(b), na.rm = TRUE) }),
   max_abs_diff = sapply(names(SV), function(v) {
     a <- SV[[v]]; b <- GD[[v]]; if (is.numeric(a) && is.numeric(b)) max(c(0, abs(a - b)), na.rm = TRUE) else NA }))
-cat("\n=== Part B: design frame rebuilt from the saved covariates vs saved nhanes_model4_design_frame ===\n")
+cat(sprintf("\n=== Part B: design frame rebuilt from %s vs saved nhanes_model4_design_frame ===\n",
+            if (have_all) "the covariates re-derived in Part A" else "the saved covariates"))
 cat("rows:", nrow(GD), "vs", nrow(SV), "| columns:", ncol(GD), "vs", ncol(SV),
     "| columns with any differing cell:", sum(chkB$differing_cells > 0, na.rm = TRUE), "\n")
 print(chkB[chkB$column %in% keep, ], row.names = FALSE)
