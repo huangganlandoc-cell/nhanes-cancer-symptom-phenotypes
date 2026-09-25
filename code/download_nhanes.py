@@ -16,6 +16,10 @@ Notes
   follow-up through 31 December 2019.
 * Files are written as gzipped CSV to keep the archive small and readable from
   R, Python and Excel without a SAS/XPORT reader.
+* The Model 4 modules (kidney conditions, blood count, biochemistry, physical
+  functioning, prescription medications) are needed only by
+  code/reconstructed/derive_model4_covariates.R; they are listed in their own
+  manifest, _manifest_model4.csv, so _manifest.csv keeps its original rows.
 """
 
 import argparse
@@ -29,6 +33,8 @@ CYCLES = [(2005, "_D"), (2007, "_E"), (2009, "_F"), (2011, "_G"),
           (2013, "_H"), (2015, "_I"), (2017, "_J")]
 
 MODULES = ["DEMO", "MCQ", "DPQ", "SLQ", "BMX", "SMQ", "BPQ", "DIQ", "PAQ", "ALQ", "HUQ"]
+
+MODEL4_MODULES = ["KIQ_U", "CBC", "BIOPRO", "PFQ", "RXQ_RX"]
 
 NHANES_URL = ("https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/"
               "{year}/DataFiles/{module}{suffix}.xpt")
@@ -68,22 +74,24 @@ def main():
     os.makedirs(raw_dir, exist_ok=True)
     os.makedirs(mort_dir, exist_ok=True)
 
-    manifest = []
-    for year, suffix in CYCLES:
-        for module in MODULES:
-            df, url = fetch_xpt(year, module, suffix)
-            if df is None:
-                print(f"MISSING  {module}{suffix} {year}")
-                continue
-            name = f"{module}{suffix}_{year}-{year + 1}.csv.gz"
-            df.to_csv(os.path.join(raw_dir, name), index=False, compression="gzip")
-            manifest.append({"file": name, "module": module,
-                             "cycle": f"{year}-{year + 1}",
-                             "nhanes_suffix": suffix, "rows": len(df),
-                             "cols": df.shape[1], "source_url": url})
-            print(f"{name}  {df.shape}")
+    for modules, manifest_name in [(MODULES, "_manifest.csv"),
+                                   (MODEL4_MODULES, "_manifest_model4.csv")]:
+        manifest = []
+        for year, suffix in CYCLES:
+            for module in modules:
+                df, url = fetch_xpt(year, module, suffix)
+                if df is None:
+                    print(f"MISSING  {module}{suffix} {year}")
+                    continue
+                name = f"{module}{suffix}_{year}-{year + 1}.csv.gz"
+                df.to_csv(os.path.join(raw_dir, name), index=False, compression="gzip")
+                manifest.append({"file": name, "module": module,
+                                 "cycle": f"{year}-{year + 1}",
+                                 "nhanes_suffix": suffix, "rows": len(df),
+                                 "cols": df.shape[1], "source_url": url})
+                print(f"{name}  {df.shape}")
 
-    pd.DataFrame(manifest).to_csv(os.path.join(raw_dir, "_manifest.csv"), index=False)
+        pd.DataFrame(manifest).to_csv(os.path.join(raw_dir, manifest_name), index=False)
 
     frames = [fetch_mortality(year) for year, _ in CYCLES]
     mort = pd.concat(frames, ignore_index=True)

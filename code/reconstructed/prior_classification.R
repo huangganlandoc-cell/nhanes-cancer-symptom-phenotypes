@@ -75,4 +75,8 @@ res$joint_p <- c(rep(signif(regTermTest(mlan,~lan)$p,4), sum(grepl("^Lan",res$sp
                  rep(signif(regTermTest(mboth,~lca)$p,4), sum(grepl("^phenotype",res$spec))))
 write.csv(res, file.path(OUT, "RR_vs_prior_classification.csv"), row.names=FALSE)
 write.csv(ov,  file.path(OUT, "RR_crosstab_vs_prior.csv"))
+write.csv(data.frame(test = c("Lan-style classification alone", "Lan-style classification with phenotype",
+                              "phenotype with Lan-style classification"),
+                     joint_p = c(regTermTest(mlan, ~lan)$p, regTermTest(mboth, ~lan)$p, regTermTest(mboth, ~lca)$p)),
+          file.path(OUT, "RR_prior_joint_tests.csv"), row.names=FALSE)
 cat("prior_classification.R done\n")

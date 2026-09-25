@@ -74,6 +74,7 @@ for ph in ["Sleep-fatigue", "High symptom burden", "Somatic-depressive"]:
 a1.axhline(1, color="#8c8c8c", lw=0.9, ls=(0, (4, 3)), zorder=1)
 a1.set_yscale("log")
 a1.set_yticks([0.6, 1, 2, 4]); a1.set_yticklabels(["0.6", "1", "2", "4"])
+a1.yaxis.set_minor_formatter(NullFormatter())   # no automatic labels on log-scale minor ticks
 a1.set_ylim(0.55, 5.8)
 a1.set_xticks(years); a1.set_xlim(-0.4, 7.9)
 a1.set_xlabel("Follow-up excluded after examination (years)")

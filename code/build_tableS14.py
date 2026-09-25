@@ -1,8 +1,13 @@
-"""Supplementary Table S14: Model 4a and the measurement model without SLQ050 (post hoc, 2026-09-24).
+"""Supplementary Tables S14 and S15 (post hoc analyses added after an internal review of the design).
 
-Reads the outputs of code/analysis_model4a.R and code/analysis_drop_slq050.R and writes
-supplementary/TableS14_model4a_drop_slq050.csv. Run from the project root after both scripts.
+S14: Model 4a (code/analysis_model4a.R), the measurement model without SLQ050
+     (code/analysis_drop_slq050.R) and the phenotype contrast at a fixed PHQ-9 score
+     (code/analysis_fixed_score_contrast.R) -> supplementary/TableS14_model4a_drop_slq050.csv
+S15: survivors excluded for incomplete symptom data versus those included
+     (code/analysis_excluded_comparison.R) -> supplementary/TableS15_excluded_vs_included.csv
+Run from the project root after those scripts.
 """
+import shutil
 import csv
 
 S = "supporting/"
@@ -34,6 +39,10 @@ for r in rows("RR6_drop_slq050_cox.csv"):
         "modal class assignment", r["term"].replace("Sleep-fatigue", "sleep-fatigue")
         .replace("Somatic-depressive", "somatic-depressive").replace("High symptom burden", "high symptom burden"), r)
 
+for r in rows("RR7_fixed_score_contrast.csv"):
+    add("C. Phenotype contrasts with the summed PHQ-9 score in the model", covname[r["model"]],
+        f"modal class assignment; {r['severity']}", r["contrast"], r)
+
 fit = rows("RR6_drop_slq050_fit.csv")
 f4 = next(r for r in fit if r["classes"] == "4")
 note = (f"B: ten-indicator solutions with 3, 4 and 5 classes had BIC "
@@ -45,3 +54,6 @@ with open("supplementary/TableS14_model4a_drop_slq050.csv", "w", newline="", enc
     w.writeheader(); w.writerows(out)
 print(f"wrote supplementary/TableS14_model4a_drop_slq050.csv ({len(out)} rows)")
 print(note)
+shutil.copyfile(S + "RR7_excluded_comparison.csv", "supplementary/TableS15_excluded_vs_included.csv")
+print("wrote supplementary/TableS15_excluded_vs_included.csv")
+

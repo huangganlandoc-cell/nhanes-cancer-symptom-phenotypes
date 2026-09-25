@@ -5,6 +5,8 @@
 ##   lca_fit_indices_cancer.csv        (source of Supplementary Table S1)
 ## Extra check written to review/reproduction/output/input_checks/:
 ##   check_lca_fits_cancer_refit.csv   (refitted k = 1..5 vs data/derived/lca_fits_cancer.rds)
+## Writes data/derived/lca_fits_cancer.rds ONLY if that file does not exist yet (a run from the
+## raw data); an existing file is never overwritten, and the check then compares the refit with it.
 ##
 ## Reconstructed from the original analysis log:
 ##   step 54: poLCA k = 1..5, seed 20260907, 30 random starts,
@@ -25,8 +27,12 @@ G <- read.csv("data/derived/nhanes_cancer_design_frame.csv.gz"); a <- subset(G, 
 set.seed(20260907)
 f <- cbind(phqi1,phqi2,phqi3,phqi4,phqi5,phqi6,phqi7,phqi8,phqi9,sleepcat,slq050b)~1
 fits <- lapply(1:5, function(k) poLCA(f, a, nclass=k, maxiter=8000, nrep=30, verbose=FALSE, na.rm=TRUE))
-## original: saveRDS(fits,"lca_fits_cancer.rds")  -- not re-saved here (data/ is read-only);
-## instead the refit is compared with the saved object below.
+## original: saveRDS(fits,"lca_fits_cancer.rds")  -- saved here only when the file is absent;
+## otherwise the refit is compared with the saved object below.
+if (!file.exists("data/derived/lca_fits_cancer.rds")) {
+  saveRDS(fits, "data/derived/lca_fits_cancer.rds")
+  cat("data/derived/lca_fits_cancer.rds did not exist: saved the refit (the check below is then trivial)\n")
+}
 ic <- data.frame(k=1:5, logLik=round(sapply(fits,`[[`,"llik"),1), AIC=round(sapply(fits,`[[`,"aic"),1),
   BIC=round(sapply(fits,`[[`,"bic"),1),
   cAIC=round(sapply(fits,function(x) -2*x$llik+x$npar*(log(x$Nobs)+1)),1),

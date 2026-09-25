@@ -1,9 +1,21 @@
 ## Symptom phenotypes and mortality among US cancer survivors, NHANES 2005-2018
 ## Survey-weighted Cox proportional hazards; LCA-derived symptom phenotypes
+## Run    : /opt/homebrew/bin/Rscript code/analysis_cancer_symptom_mortality.R   (from the project root)
+## Inputs : data/derived/nhanes_cancer_design_frame.csv.gz, data/derived/lca_fits_cancer.rds
+##          (its columns only_nms and any_mel were added after this script was first run; they
+##          are dropped on reading, as analysis_primary_exclNMS.R merges them in itself)
+## Outputs: cox_*.csv, rcs_curves.csv, km_curves.csv, lca_prevalence_cancer.csv,
+##          lca_profiles_cancer.csv -> supporting/; analysis_frame.rds -> data/derived/
+##          (all of them to <dir> instead when run with OUT=<dir>)
 suppressPackageStartupMessages({library(poLCA);library(survey);library(survival);library(rms)})
+DER <- "data/derived"; if (!dir.exists(DER)) stop("run from the project root")
+OUT <- Sys.getenv("OUT"); if (nzchar(OUT)) dir.create(OUT, recursive=TRUE, showWarnings=FALSE)
+OCSV <- if (nzchar(OUT)) OUT else "supporting"; ORDS <- if (nzchar(OUT)) OUT else DER
+dir.create(OCSV, showWarnings=FALSE)
 
-G  <- read.csv("nhanes_cancer_design_frame.csv")
-fits <- readRDS("lca_fits_cancer.rds")
+G  <- read.csv(file.path(DER,"nhanes_cancer_design_frame.csv.gz"))
+G  <- G[, setdiff(names(G), c("only_nms","any_mel"))]
+fits <- readRDS(file.path(DER,"lca_fits_cancer.rds"))
 K <- 4                                   # selected by BIC and cAIC minima
 ft <- fits[[K]]
 a  <- subset(G, inAnalysis==1)
@@ -73,9 +85,9 @@ sens <- rbind(
         { s2 <- subset(des, inAnalysis==1 & time>2)
           m <- svycoxph(as.formula(paste0("Surv(time,event)~lca+",C3)), design=s2)
           cbind(model="Model 3", outcome="event", tidy_hr(m,"^lca")) }))
-write.csv(main,"cox_main.csv",row.names=FALSE)
-write.csv(cont,"cox_secondary_exposures.csv",row.names=FALSE)
-write.csv(sens,"cox_sensitivity.csv",row.names=FALSE)
+write.csv(main,file.path(OCSV,"cox_main.csv"),row.names=FALSE)
+write.csv(cont,file.path(OCSV,"cox_secondary_exposures.csv"),row.names=FALSE)
+write.csv(sens,file.path(OCSV,"cox_sensitivity.csv"),row.names=FALSE)
 
 ## ---- prespecified subgroups ------------------------------------------------
 subgroups <- list(
@@ -98,7 +110,7 @@ sg <- do.call(rbind, lapply(names(subgroups), function(nm) {
   if (inherits(m,"try-error")) return(NULL)
   cbind(subgroup=nm, n=n, events=ev, tidy_hr(m,"^lca"))
 }))
-write.csv(sg,"cox_subgroups.csv",row.names=FALSE)
+write.csv(sg,file.path(OCSV,"cox_subgroups.csv"),row.names=FALSE)
 
 ## ---- restricted cubic splines ---------------------------------------------
 rcs_curve <- function(var, knots) {
@@ -114,28 +126,30 @@ rcs_curve <- function(var, knots) {
   for (v in names(nd)[!num]) nd[[v]] <- G[[v]][G$inAnalysis==1][1]
   nd$lca <- factor("Low symptom burden", levels=levels(G$lca)); nd[[var]] <- grid
   ref <- nd; ref[[var]] <- median(G[[var]][G$inAnalysis==1], na.rm=TRUE)
-  lp  <- predict(m, newdata=nd, type="lp", se.fit=TRUE)
-  lpr <- predict(m, newdata=ref[1,,drop=FALSE], type="lp")
-  data.frame(var=var, x=grid, HR=exp(lp$fit-as.numeric(lpr)),
-             lo=exp(lp$fit-as.numeric(lpr)-1.96*lp$se.fit),
-             hi=exp(lp$fit-as.numeric(lpr)+1.96*lp$se.fit))
+  ## interval for the log hazard ratio against the reference: variance of the contrast in the
+  ## spline terms (predict(se.fit = TRUE) would give that of the whole centred linear predictor)
+  tt <- delete.response(terms(m))
+  mm <- function(d) model.matrix(tt, model.frame(tt, d, xlev = m$xlevels))[, names(coef(m)), drop = FALSE]
+  D <- mm(nd) - mm(ref[rep(1, nrow(nd)), , drop = FALSE])
+  est <- drop(D %*% coef(m)); se <- sqrt(pmax(rowSums((D %*% vcov(m)) * D), 0))
+  data.frame(var=var, x=grid, HR=exp(est), lo=exp(est-1.96*se), hi=exp(est+1.96*se))
 }
 rcsdat <- rbind(try(rcs_curve("phq9_score", c(.05,.35,.65,.95)), silent=TRUE),
                 try(rcs_curve("sleep_h",    c(.05,.35,.65,.95)), silent=TRUE))
-write.csv(rcsdat,"rcs_curves.csv",row.names=FALSE)
+write.csv(rcsdat,file.path(OCSV,"rcs_curves.csv"),row.names=FALSE)
 
 ## ---- weighted KM and prevalence -------------------------------------------
 km <- svykm(Surv(time,event)~lca, design=sub, se=FALSE)
 kmd <- do.call(rbind, lapply(names(km), function(l)
   data.frame(lca=l, time=km[[l]]$time, surv=km[[l]]$surv)))
-write.csv(kmd,"km_curves.csv",row.names=FALSE)
+write.csv(kmd,file.path(OCSV,"km_curves.csv"),row.names=FALSE)
 wp <- svymean(~lca, sub, na.rm=TRUE); ci <- confint(wp)
 prev <- data.frame(class=gsub("^lca","",names(coef(wp))), weighted_pct=coef(wp)*100,
                    lo=ci[,1]*100, hi=ci[,2]*100,
                    n=as.numeric(table(G$lca[G$inAnalysis==1])),
                    deaths=as.numeric(tapply(G$event[G$inAnalysis==1], G$lca[G$inAnalysis==1], sum)),
                    mean_maxpost=as.numeric(tapply(G$maxpost[G$inAnalysis==1], G$lca[G$inAnalysis==1], mean)))
-write.csv(prev,"lca_prevalence_cancer.csv",row.names=FALSE)
+write.csv(prev,file.path(OCSV,"lca_prevalence_cancer.csv"),row.names=FALSE)
 
 ## ---- item-response profiles ----------------------------------------------
 items <- c("Anhedonia","Depressed mood","Sleep disturbance","Fatigue","Appetite change",
@@ -145,6 +159,6 @@ pf <- do.call(rbind, lapply(1:9, function(j)
 pf <- rbind(pf, data.frame(item="Short sleep (<6 h)",  class=LAB, prob=ft$probs[[10]][,1]*100),
                 data.frame(item="Long sleep (>=9 h)",  class=LAB, prob=ft$probs[[10]][,3]*100),
                 data.frame(item="Insomnia complaint",  class=LAB, prob=ft$probs[[11]][,1]*100))
-write.csv(pf,"lca_profiles_cancer.csv",row.names=FALSE)
-saveRDS(G,"analysis_frame.rds")
+write.csv(pf,file.path(OCSV,"lca_profiles_cancer.csv"),row.names=FALSE)
+saveRDS(G,file.path(ORDS,"analysis_frame.rds"))
 cat("done\n")

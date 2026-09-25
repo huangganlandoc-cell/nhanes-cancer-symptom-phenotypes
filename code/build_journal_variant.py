@@ -100,10 +100,10 @@ def supplementary_wording(md, style):
                           manifest, flags=re.M)              # the manifest keys must stay as build_docx wants
         body = body.replace("## Supplementary information", "## Supplementary Information")
         body = body.replace("**Additional file 1.** Supplementary figures S1 to S3 and supplementary "
-                            "tables S1 to S14, with their legends.\n\n**Additional file 2.** STROBE "
+                            "tables S1 to S15, with their legends.\n\n**Additional file 2.** STROBE "
                             "checklist for cohort studies.",
                             "Supplementary Information accompanies this paper: Supplementary Figs. S1 to "
-                            "S3 and Supplementary Tables S1 to S14 with their legends, followed by the "
+                            "S3 and Supplementary Tables S1 to S15 with their legends, followed by the "
                             "STROBE checklist for cohort studies.")
         body = body.replace("(Additional file 2)", "(Supplementary Information)")
         md = body + sep + manifest
@@ -187,9 +187,9 @@ def build(key, out_root=Path("submission")):
     combined = v.get("supp_pdf")          # Nature Portfolio wants one supplementary file, preferably PDF
     title = "Supplementary Information" if combined else "Additional file 1"
     prefix = "Supplementary " if combined else ""
-    intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S14 and the STROBE checklist for '
-             'cohort studies, for "Symptom phenotypes and mortality in US cancer survivors: a nationally '
-             'representative cohort study".') if combined else None
+    intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S15 and the STROBE checklist for '
+             'cohort studies, for "Symptom phenotypes and mortality in US cancer survivors: a '
+             'cohort study".') if combined else None
     strobe = Path("supporting/STROBE_checklist_EN.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp_dir:
         supp = Path(tmp_dir) / "Supplementary_Information.docx" if combined else out / "06_Additional_file_1.docx"

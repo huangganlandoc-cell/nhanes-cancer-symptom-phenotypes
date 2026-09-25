@@ -49,6 +49,21 @@ for (m in c("C3", "C4")) for (t in c("Somatic-depressive vs low", "Somatic-depre
       sprintf("jackknife, step 3 only %.3f | jackknife, steps 1-3 %.3f | bootstrap, steps 1-3 %.3f", a$se, b$se, k$se),
       sprintf("95%% CI %.2f-%.2f | %.2f-%.2f | %.2f-%.2f", a$lo, a$hi, b$lo, b$hi, k$lo, k$hi))
 }
+## bootstrap SE without the unstable replicates: step-3 EM stopped at maxit, or a membership
+## coefficient above 15 (the ridge trigger; Model 3 replicates are fitted without the penalty, as its
+## full-sample fit). Variance as in analysis_three_step.R: sum((theta_r - estimate)^2) / (R - 1).
+FB <- readRDS(file.path(OUT, "RR5_three_step_fits.rds")); BB <- readRDS(file.path(OUT, "RR5_jackknife_full_bootstrap.rds"))
+for (m in c("C3", "C4")) {
+  est <- FB[[m]]$fit$coef["clsSomaticDepressive"]
+  x <- BB$theta[, paste0(m, ":clsSomaticDepressive")]
+  nc <- BB$diag[, paste0(m, ":stop_rule")] == 3; dv <- BB$diag[, paste0(m, ":max_abs_mn")] > 15
+  sev <- function(v) sqrt(sum((v - est)^2) / (length(v) - 1))
+  ci <- function(s) sprintf("%.2f-%.2f", exp(est - 1.96 * s), exp(est + 1.96 * s))
+  add("D. Implementation checks", sprintf("Bootstrap without unstable replicates, %s, Somatic-depressive vs low", MLAB[m]),
+      sprintf("all 500: SE %.3f | without %d not converged: SE %.3f | without %d not converged or with a membership coefficient above 15: SE %.3f",
+              sev(x), sum(nc), sev(x[!nc]), sum(nc | dv), sev(x[!(nc | dv)])),
+      sprintf("95%% CI %s | %s | %s", ci(sev(x)), ci(sev(x[!nc])), ci(sev(x[!(nc | dv)]))))
+}
 se <- read.csv(file.path(OUT, "RR5_check2_se_comparison.csv"))
 for (i in seq_len(nrow(se))) add("D. Implementation checks",
   sprintf("Modal model, %s, %s: SE of log HR", ifelse(se$model[i] == "C3", "Model 3", "Model 4"),

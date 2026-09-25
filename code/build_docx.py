@@ -320,7 +320,7 @@ def build(md_path='manuscript/Manuscript.md', out='Manuscript_with_figures.docx'
 
 def build_additional_file(md_path='manuscript/Manuscript.md', out='Additional_file_1.docx',
                           title='Additional file 1', label_prefix='', intro=None):
-    """One supplementary file: figures S1 to S3 then tables S1 to S14, each with its manuscript legend.
+    """One supplementary file: figures S1 to S3 then tables S1 to S15, each with its manuscript legend.
     BMC calls it Additional file 1; Nature Portfolio wants Supplementary Information and requires the
     word "Supplementary" on every item label, which is what label_prefix supplies."""
     import glob
@@ -336,8 +336,8 @@ def build_additional_file(md_path='manuscript/Manuscript.md', out='Additional_fi
     h = doc.add_heading(title, level=1)
     for r in h.runs:
         r.font.size = Pt(14); r.font.color.rgb = RGBColor(0, 0, 0)
-    para(doc, intro or 'Supplementary figures S1 to S3 and supplementary tables S1 to S14 for '
-         '"Symptom phenotypes and mortality in US cancer survivors: a nationally representative cohort study".',
+    para(doc, intro or 'Supplementary figures S1 to S3 and supplementary tables S1 to S15 for '
+         '"Symptom phenotypes and mortality in US cancer survivors: a cohort study".',
          base=10, space_after=12)
     for key in ['Figure S1', 'Figure S2', 'Figure S3']:
         insert_figure(doc, key, legends, label=label_prefix + key)

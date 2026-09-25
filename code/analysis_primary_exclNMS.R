@@ -2,10 +2,18 @@
 ## Symptom phenotypes are defined by the 4-class LCA fitted in the FULL cancer-survivor
 ## cohort (n=3,268); only the analytic population is restricted, so phenotype definitions
 ## do not shift with the analytic sample.
+## Run    : /opt/homebrew/bin/Rscript code/analysis_primary_exclNMS.R   (from the project root)
+## Inputs : data/derived/analysis_frame.rds, data/derived/nhanes_cancer_design_frame.csv.gz
+## Outputs: P_*.csv -> supporting/, analysis_frame_primary.rds -> data/derived/
+##          (all of them to <dir> instead when run with OUT=<dir>)
 suppressPackageStartupMessages({library(survey);library(survival);library(rms)})
+DER <- "data/derived"; if (!dir.exists(DER)) stop("run from the project root")
+OUT <- Sys.getenv("OUT"); if (nzchar(OUT)) dir.create(OUT, recursive=TRUE, showWarnings=FALSE)
+OCSV <- if (nzchar(OUT)) OUT else "supporting"; ORDS <- if (nzchar(OUT)) OUT else DER
+dir.create(OCSV, showWarnings=FALSE)
 
-G <- readRDS("analysis_frame.rds")
-nf <- read.csv("nhanes_cancer_design_frame.csv")[,c("SEQN","only_nms","any_mel")]
+G <- readRDS(file.path(DER,"analysis_frame.rds"))
+nf <- read.csv(file.path(DER,"nhanes_cancer_design_frame.csv.gz"))[,c("SEQN","only_nms","any_mel")]
 G  <- merge(G, nf, by="SEQN", all.x=TRUE)
 G$primary <- as.numeric(G$inAnalysis==1 & !(G$only_nms %in% c(TRUE,"True")))
 G$cvd <- as.numeric(G$cvd)
@@ -44,18 +52,18 @@ for(v in c(ct,bn)){
     variable=if(i==1) v else "",level=lv[i],Overall=sprintf("%.1f",coef(ov)[i]*100),
     t(setNames(sprintf("%.1f",mn[,1+i]*100),mn$lca)),p=if(i==1) signif(pv,3) else NA,check.names=FALSE)
 }
-write.csv(do.call(rbind,rows),"P_table1_weighted_baseline.csv",row.names=FALSE)
+write.csv(do.call(rbind,rows),file.path(OCSV,"P_table1_weighted_baseline.csv"),row.names=FALSE)
 
 ## ---- primary + cause-specific, with multiplicity ---------------------------
 main <- do.call(rbind,lapply(c("event","ev_ca","ev_cvd"),function(o) prog("lca","^lca",o)))
 m3 <- subset(main,model=="Model 3"); m3$p_bh <- p.adjust(m3$p,"BH"); m3$p_bonf <- p.adjust(m3$p,"bonferroni")
-write.csv(main,"P_cox_main.csv",row.names=FALSE); write.csv(m3,"P_multiplicity_main.csv",row.names=FALSE)
+write.csv(main,file.path(OCSV,"P_cox_main.csv"),row.names=FALSE); write.csv(m3,file.path(OCSV,"P_multiplicity_main.csv"),row.names=FALSE)
 
 ## ---- secondary exposures ---------------------------------------------------
 sec <- rbind(prog("dep_cat","^dep_cat"),prog("sleep3","^sleep3"),
              prog("insomnia","^insomnia"),prog("I(phq9_score/5)","phq9_score"))
 s3 <- subset(sec,model=="Model 3"); s3$p_bh <- p.adjust(s3$p,"BH")
-write.csv(sec,"P_cox_secondary.csv",row.names=FALSE); write.csv(s3,"P_multiplicity_secondary.csv",row.names=FALSE)
+write.csv(sec,file.path(OCSV,"P_cox_secondary.csv"),row.names=FALSE); write.csv(s3,file.path(OCSV,"P_multiplicity_secondary.csv"),row.names=FALSE)
 
 ## ---- prespecified subgroups ------------------------------------------------
 SG <- list(`Breast cancer`=quote(has_Breast %in% c(TRUE,"True")),
@@ -75,7 +83,7 @@ sg <- do.call(rbind,lapply(names(SG),function(nm){
   if(inherits(m,"try-error")) return(NULL)
   cbind(subgroup=nm,n=sum(G$.sg),events=sum(G$event[G$.sg==1],na.rm=TRUE),
         model=if(nm %in% sexfree) "Model 2 (sex omitted)" else "Model 2", tidy(m,"^lca"))}))
-sg$p_bh <- p.adjust(sg$p,"BH"); write.csv(sg,"P_cox_subgroups.csv",row.names=FALSE)
+sg$p_bh <- p.adjust(sg$p,"BH"); write.csv(sg,file.path(OCSV,"P_cox_subgroups.csv"),row.names=FALSE)
 
 ## ---- restricted cubic splines ---------------------------------------------
 rcs_curve <- function(var,knots=c(.05,.35,.65,.95)){
@@ -89,33 +97,40 @@ rcs_curve <- function(var,knots=c(.05,.35,.65,.95)){
   for(v in names(nd)[!num]) nd[[v]] <- d0[[v]][1]
   nd$lca <- factor("Low symptom burden",levels=levels(G$lca)); nd[[var]] <- grid
   ref <- nd[1,,drop=FALSE]; ref[[var]] <- median(d0[[var]],na.rm=TRUE)
-  lp <- predict(m,newdata=nd,type="lp",se.fit=TRUE); lpr <- as.numeric(predict(m,newdata=ref,type="lp"))
-  data.frame(var=var,x=grid,HR=exp(lp$fit-lpr),lo=exp(lp$fit-lpr-1.96*lp$se.fit),
-             hi=exp(lp$fit-lpr+1.96*lp$se.fit))
+  lp <- predict(m,newdata=nd,type="lp"); lpr <- as.numeric(predict(m,newdata=ref,type="lp"))
+  ## Interval for the log hazard ratio against the reference (cohort median): only the spline terms
+  ## differ between nd and ref, so the variance is that of the contrast, zero at the reference.
+  ## (predict(se.fit = TRUE) gives the SE of the whole centred linear predictor, which is not this.)
+  tt <- delete.response(terms(m))
+  mm <- function(d) model.matrix(tt, model.frame(tt, d, xlev = m$xlevels))[, names(coef(m)), drop = FALSE]
+  D <- mm(nd) - mm(ref)[rep(1, nrow(nd)), , drop = FALSE]
+  est <- drop(D %*% coef(m)); se <- sqrt(pmax(rowSums((D %*% vcov(m)) * D), 0))
+  stopifnot(max(abs(est - (lp - lpr))) < 1e-8)
+  data.frame(var=var,x=grid,HR=exp(est),lo=exp(est-1.96*se),hi=exp(est+1.96*se))
 }
-write.csv(rbind(rcs_curve("phq9_score"),rcs_curve("sleep_h")),"P_rcs_curves.csv",row.names=FALSE)
+write.csv(rbind(rcs_curve("phq9_score"),rcs_curve("sleep_h")),file.path(OCSV,"P_rcs_curves.csv"),row.names=FALSE)
 
 ## ---- weighted KM, prevalence, landmark, 3-class sensitivity ----------------
 km <- svykm(Surv(time,event)~lca,design=P,se=FALSE)
 write.csv(do.call(rbind,lapply(names(km),function(l)
-  data.frame(lca=l,time=km[[l]]$time,surv=km[[l]]$surv))),"P_km_curves.csv",row.names=FALSE)
+  data.frame(lca=l,time=km[[l]]$time,surv=km[[l]]$surv))),file.path(OCSV,"P_km_curves.csv"),row.names=FALSE)
 wp <- svymean(~lca,P,na.rm=TRUE); ci <- confint(wp)
 write.csv(data.frame(class=gsub("^lca","",names(coef(wp))),weighted_pct=coef(wp)*100,
   lo=ci[,1]*100,hi=ci[,2]*100,n=as.numeric(table(G$lca[G$primary==1])),
   deaths=as.numeric(tapply(G$event[G$primary==1],G$lca[G$primary==1],sum)),
   mean_maxpost=as.numeric(tapply(G$maxpost[G$primary==1],G$lca[G$primary==1],mean))),
-  "P_lca_prevalence.csv",row.names=FALSE)
+  file.path(OCSV,"P_lca_prevalence.csv"),row.names=FALSE)
 land <- do.call(rbind,lapply(c(0,1,2,3,5),function(L){
   G$.k <- as.numeric(G$primary==1 & G$time>L); s <- subset(mkdes(G), .k==1)
   m <- svycoxph(as.formula(paste0("Surv(time,event)~lca+",C3)),design=s)
   cbind(exclude_yr=L,n=sum(G$.k),events=sum(G$event[G$.k==1],na.rm=TRUE),tidy(m,"^lca"))}))
 m3c <- svycoxph(as.formula(paste0("Surv(time,event)~lca3+",C3)),design=P)
 full <- svycoxph(as.formula(paste0("Surv(time,event)~lca+",C3)),design=subset(des,inAnalysis==1))
-write.csv(land,"P_sens_landmark.csv",row.names=FALSE)
+write.csv(land,file.path(OCSV,"P_sens_landmark.csv"),row.names=FALSE)
 write.csv(rbind(cbind(analysis="3-class solution",tidy(m3c,"^lca3")),
                 cbind(analysis="full cohort (incl. non-melanoma skin only)",tidy(full,"^lca"))),
-          "P_sens_other.csv",row.names=FALSE)
-saveRDS(G,"analysis_frame_primary.rds")
+          file.path(OCSV,"P_sens_other.csv"),row.names=FALSE)
+saveRDS(G,file.path(ORDS,"analysis_frame_primary.rds"))
 cat("primary n =",sum(G$primary),"deaths =",sum(G$event[G$primary==1]),
     "person-years =",round(sum(G$time[G$primary==1]),0),
     "median FU =",round(median(G$time[G$primary==1]),2),"\n")

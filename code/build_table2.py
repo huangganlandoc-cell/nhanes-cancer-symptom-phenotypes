@@ -77,8 +77,8 @@ with open("supplementary/TableS13_model_progression.csv", "w", newline="", encod
 
 # values quoted in the text must still be what the table shows
 chk = {r[1]: r for r in s13[1:]}
-assert main[("Model 3", "All-cause", "Somatic-depressive")]["HR"].startswith("1.80")
-assert pfmt(bh3[("Cardiovascular or stroke", "Somatic-depressive")]) == "0.053"
+assert main[("Model 3", "All-cause", "Somatic-depressive")]["HR"].startswith("1.81")
+assert pfmt(bh3[("Cardiovascular or stroke", "Somatic-depressive")]) == "0.032"
 print("wrote tables/Table2_main_cox.csv and supplementary/TableS13_model_progression.csv")
 for r in t2:
     print("  " + " | ".join(r))

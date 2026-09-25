@@ -1,8 +1,8 @@
 ## =============================================================================
 ## derive_model4_covariates.R  --  how the Model 4 covariates were built
 ##
-## PART A IS NOT RUN: it requires 35 NHANES files that are NOT in data/raw_nhanes
-## (they were downloaded in the original run and never saved to disk):
+## PART A RUNS ONLY WHEN these 35 NHANES files are in data/raw_nhanes (the original run downloaded
+## them but never saved them; code/download_nhanes.py now fetches them):
 ##   KIQ_U  (kidney conditions, KIQ022 "weak/failing kidneys"):
 ##          KIQ_U_D.xpt KIQ_U_E.xpt KIQ_U_F.xpt KIQ_U_G.xpt KIQ_U_H.xpt KIQ_U_I.xpt KIQ_U_J.xpt
 ##   CBC    (complete blood count, LBXHGB haemoglobin):
@@ -14,11 +14,11 @@
 ##   RXQ_RX (prescription medications in the past 30 days: RXDUSE, RXDDRUG, RXDCOUNT):
 ##          RXQ_RX_D.xpt RXQ_RX_E.xpt RXQ_RX_F.xpt RXQ_RX_G.xpt RXQ_RX_H.xpt RXQ_RX_I.xpt RXQ_RX_J.xpt
 ##   (cycles D..J = 2005-2006 .. 2017-2018; source https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/
-##    {2005,2007,...,2017}/DataFiles/<file>). If they are ever added to data/raw_nhanes with the
-##    project naming convention (e.g. KIQ_U_D_2005-2006.csv.gz, RXQ_RX_J_2017-2018.csv.gz), Part A
-##    runs automatically. Nothing is downloaded by this script.
+##    {2005,2007,...,2017}/DataFiles/<file>). download_nhanes.py saves them with the project naming
+##    convention (e.g. KIQ_U_D_2005-2006.csv.gz, RXQ_RX_J_2017-2018.csv.gz) and Part A then runs
+##    automatically. Nothing is downloaded by this script.
 ## The analysis scripts (model4.R, dimensional.R, all_adult_lca.R, measurement_sensitivity_RR4.R)
-## therefore start from the saved files data/derived/nhanes_model4_covariates.csv and
+## start from the saved files data/derived/nhanes_model4_covariates.csv and
 ## data/derived/nhanes_model4_design_frame.csv.gz.
 ##
 ## What this script DOES run:
@@ -28,6 +28,11 @@
 ##                  saved covariates file and compared with the saved nhanes_model4_design_frame
 ## Outputs: review/reproduction/output/input_checks/check_model4_mcq_conditions.csv
 ##          review/reproduction/output/input_checks/check_model4_design_frame.csv
+##          data/derived/nhanes_model4_covariates.csv       only if absent and Part A ran
+##          data/derived/nhanes_model4_design_frame.csv.gz  only if absent
+##          (both in pandas' to_csv layout, the design-frame columns copied as text from
+##          nhanes_cancer_design_frame.csv.gz; an existing file is never overwritten, and the
+##          comparisons below then read the file as before)
 ##
 ## Reconstructed from the original analysis log:
 ##   step 244: downloaded KIQ_U, CBC, BIOPRO, PFQ, RXQ_RX (into EXTRA)
@@ -56,6 +61,22 @@ rawfile <- function(mod, y) file.path(RAWD, sprintf("%s%s_%s-%d.csv.gz", mod, CY
 left_join <- function(x, y, by = "SEQN") {              # pandas merge(how="left"): keeps x's row order
   i <- match(x[[by]], y[[by]]); out <- cbind(x, y[i, setdiff(names(y), by), drop = FALSE]); rownames(out) <- NULL; out }
 yn <- function(v) ifelse(v == 1, 1, ifelse(v == 2, 0, NA))   # 1 = yes, 2 = no, anything else missing
+py_num <- function(x) {                                        # Python repr() of a float, as pandas writes it
+  fmt <- function(v, k) { e <- as.integer(sub(".*e", "", sprintf("%.*e", k - 1L, v)))
+    ifelse(e >= -4 & e < 16, sprintf("%.*f", pmax(k - 1L - e, 1L), v), sprintf("%.*e", k - 1L, v)) }
+  s <- ifelse(is.na(x), "", ifelse(x > 0, "inf", "-inf")); i <- which(is.finite(x))
+  for (k in 1:17) { if (!length(i)) break
+    f <- fmt(x[i], k); ok <- k == 17L | as.numeric(f) == x[i]; s[i[ok]] <- f[ok]; i <- i[!ok] }
+  s }
+py_lines <- function(df) {                                     # lines of pandas DataFrame.to_csv(index=False)
+  cols <- lapply(df, function(col) {
+    if (is.logical(col)) ifelse(is.na(col), "", ifelse(col, "True", "False"))
+    else if (is.integer(col)) ifelse(is.na(col), "", as.character(col))
+    else if (is.numeric(col)) py_num(col)
+    else { s <- as.character(col); s[is.na(s)] <- ""; q <- grepl('[,"\n]', s)
+           s[q] <- paste0('"', gsub('"', '""', s[q]), '"'); s } })
+  c(paste(names(df), collapse = ","), do.call(paste, c(cols, sep = ",")))
+}
 
 ## =============================== PART A (steps 247, 248, 250) ================================
 MODS <- c("KIQ_U", "CBC", "BIOPRO", "PFQ", "RXQ_RX")
@@ -126,6 +147,10 @@ if (have_all) {
   M4 <- derive_part_A()
   dir.create(file.path(OUT, "intermediate"), showWarnings = FALSE)
   write.csv(M4, file.path(OUT, "intermediate", "nhanes_model4_covariates_rederived.csv"), row.names = FALSE)
+  if (!file.exists(file.path(DER, "nhanes_model4_covariates.csv"))) {
+    writeLines(py_lines(M4), file.path(DER, "nhanes_model4_covariates.csv"))
+    cat("data/derived/nhanes_model4_covariates.csv did not exist: wrote it from Part A\n")
+  }
 } else {
   cat("Part A NOT RUN: requires modules KIQ_U, CBC, BIOPRO, PFQ and RXQ_RX for all 7 cycles;",
       sum(!file.exists(need)), "of", length(need), "files are missing from data/raw_nhanes.\n",
@@ -166,6 +191,13 @@ keep <- c('SEQN','comorb_n_i','LBXHGB_i','LBXHGB_m','LBXSAL_i','LBXSAL_m','egfr_
           'func_lim_i','func_n','n_rx_i','n_rx_m','antidep_i', paste0(cond, "_i"))
 GD <- left_join(read.csv(file.path(DER, "nhanes_cancer_design_frame.csv.gz"), check.names = FALSE), M4[, keep])
 for (c in keep[-1]) GD[[c]][is.na(GD[[c]])] <- 0
+if (!file.exists(file.path(DER, "nhanes_model4_design_frame.csv.gz"))) {
+  txt <- readLines(file.path(DER, "nhanes_cancer_design_frame.csv.gz")); stopifnot(length(txt) == nrow(GD) + 1)
+  gz <- gzfile(file.path(DER, "nhanes_model4_design_frame.csv.gz"), "w")
+  writeLines(paste(txt, py_lines(GD[, keep[-1]]), sep = ","), gz); close(gz)
+  cat("data/derived/nhanes_model4_design_frame.csv.gz did not exist: wrote the rebuilt frame;",
+      "the comparison below then checks the written file against the in-memory frame\n")
+}
 SV <- read.csv(file.path(DER, "nhanes_model4_design_frame.csv.gz"), check.names = FALSE)
 chkB <- data.frame(column = names(SV), in_rederived = names(SV) %in% names(GD),
   differing_cells = sapply(names(SV), function(v) {
