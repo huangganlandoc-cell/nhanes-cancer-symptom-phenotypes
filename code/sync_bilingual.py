@@ -20,7 +20,8 @@ PREFIX = {"Abstract": "A", "Introduction": "I", "Methods": "M", "Results": "R", 
 def old_blocks():
     """(english, chinese) pairs and English->bilingual heading map from the current bilingual file."""
     t = BIL.read_text(encoding="utf-8")
-    head = t[:t.index("## Title, authors and affiliations")]
+    cut = t.find("## Title, authors and affiliations")
+    head = t[:cut if cut >= 0 else t.index("**T-1**")]
     pairs, heads = {}, {}
     for m in re.finditer(r"^(#{2,3}) (.+?)（(.+?)）\s*$", t, re.M):
         heads[m.group(2).strip()] = f"{m.group(2).strip()}（{m.group(3).strip()}）"
@@ -80,7 +81,8 @@ def build(tr_path):
     tr = json.loads(Path(tr_path).read_text(encoding="utf-8")) if tr_path else {}
     today = datetime.date.today().isoformat()
     head = re.sub(r"本稿于 \d{4}-\d{2}-\d{2} 由", f"本稿于 {today} 由", head, count=1)
-    out, missing = [head.rstrip("\n"), ""], []
+    out, missing = [head.rstrip("\n"), "",       # the title block has no heading of its own in the source
+                    f"## {heads.get('Title, authors and affiliations', 'Title, authors and affiliations（题目、作者与单位）')}", ""], []
     for u in new_units():
         if u[0] in ("h2", "h3"):
             if u[0] == "h2" and out[-1] != "---" and not out[-2:] == ["", ""]:
