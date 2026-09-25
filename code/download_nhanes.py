@@ -1,8 +1,9 @@
 """
 Download the raw NHANES and NCHS linked-mortality files used in this study.
 
-Reproduces everything under data/raw_nhanes/ and data/mortality/ from the
-public CDC endpoints. Run from the project root:
+Writes the NHANES modules for the seven cycles 2005-2006 to 2017-2018 to data/raw_nhanes/
+and the linked mortality records of those cycles to data/mortality/, from the public CDC
+endpoints. Run from the project root:
 
     python code/download_nhanes.py --out data
 

@@ -12,7 +12,7 @@ linked mortality files are downloaded from the CDC by the first stage of the pip
 ## Requirements
 
 - R 4.6 with `survey`, `survival`, `poLCA`, `rms`, `nnet` and `parallel`.
-- Python 3.11+ with `pandas`, `numpy`, `matplotlib` and `requests` (for the download). Figures 1, 2 and S1–S3 are byte-identical
+- Python 3.11+ with `pandas`, `numpy`, `statsmodels`, `matplotlib` and `requests` (for the download). Figures 1, 2 and S1–S3 are byte-identical
   to the submitted PNGs only with matplotlib 3.11.0; other versions give visually equivalent files.
 
 ## Reproducing the analysis
@@ -29,9 +29,10 @@ figures. A subset of stages can be named, for example `zsh code/run_pipeline.sh 
 | Stage | Scripts | What it does |
 |---|---|---|
 | `download` | `download_nhanes.py` | Retrieves the NHANES files for 2005–2018 and the linked mortality file |
-| `cohort` | `build_cohort.py` | Pools the seven cycles, links mortality, derives the symptom items and covariates, and writes the design frame and the file of all linkage-eligible survivors |
-| `lca` | `reconstructed/fit_indices.R`, `analysis_bvr.R`, `reconstructed/derive_model4_covariates.R`, `reconstructed/dimensional.R`, `reconstructed/all_adult_lca.R` | Latent class models with 1 to 5 classes (30 random starts), bivariate residuals, the Model 4 covariates, dimension scores, and the measurement model refitted in all adults |
+| `cohort` | `build_cohort.py`, `build_derived_inputs.py` | Pools the seven cycles, links mortality, derives the symptom items and covariates, and writes the design frame and the file of all linkage-eligible survivors; then the all-adult measurement-model input, the dimension scores and the raw PHQ-9 item scores |
+| `lca` | `reconstructed/fit_indices.R`, `analysis_bvr.R`, `reconstructed/derive_model4_covariates.R` | Latent class models with 1 to 5 classes (30 random starts), bivariate residuals, and the Model 4 covariates from the laboratory, medication, kidney and functioning files |
 | `core` | `analysis_cancer_symptom_mortality.R`, `analysis_primary_exclNMS.R` | Full cohort and primary cohort: Models 1 to 3, subgroups, splines, landmark exclusion, cause-specific models |
+| `dimensions` | `reconstructed/dimensional.R`, `reconstructed/all_adult_lca.R` | Dimension-score models and factor analysis; the measurement model refitted in all adults (about 30 minutes, skipped if its fits exist) |
 | `threestep` | `analysis_three_step.R` (`fit`, `rep`, `boot`, `sim`, `rep3only`), `export_three_step_checks.R` | Maximum-likelihood three-step correction for misclassification, with jackknife (214 replicates) and Rao–Wu bootstrap (500 replicates) standard errors that repeat all three steps, and the simulation with a known hazard ratio |
 | `model4a` | `analysis_model4a.R` | Model 3 plus the condition count and eGFR, modal and corrected |
 | `sensitivity` | `analysis_inclusive_draws_score.R`, `analysis_sleep_model3.R`, `analysis_drop_slq050.R`, `analysis_fixed_score_contrast.R`, `analysis_excluded_comparison.R` | Inclusive draws, sleep splines, the measurement model without SLQ050, the phenotype contrast at a fixed PHQ-9 score, and excluded versus included survivors |
@@ -45,6 +46,13 @@ bootstrap about half an hour to an hour; the whole pipeline takes several hours.
 control the number of worker processes; the pipeline keeps each process to one BLAS thread.
 
 ## Notes
+
+- Reproducibility (checked on 25 September 2026 with a fresh download): the raw files, the cohort design
+  frame, the all-adult input, the raw item scores and the Model 4 covariates are identical to the files the
+  analysis used (compared after decompression). The Model 4 design frame differs only in years since
+  diagnosis, corrected in `build_cohort.py`; the analyses take that variable from the cohort frame. The
+  somatic residual in the dimension scores is identical with statsmodels 0.14.6 and numpy 2.4.6 and
+  differs by up to 2e-13 with other versions.
 
 - `code/reconstructed/` holds scripts rebuilt from the interactive session in which those analyses
   were first run, each checked against the saved outputs; `compare_outputs.R` and

@@ -24,7 +24,8 @@
 ## later tidy-up of the same analyses that sets the seed only once at the top, so it does NOT
 ## reproduce these exact files (it writes RR3_* names); this script keeps the per-cell seeds.
 ## Inputs: data/derived/analysis_frame_primary.rds, data/derived/nhanes_model4_design_frame.csv.gz,
-##             supporting/nhanes_dpq_raw.csv (raw 0-3 PHQ-9 item scores, read as in the original)
+##             data/derived/nhanes_dpq_raw.csv (raw 0-3 PHQ-9 item scores, written by
+##             code/build_derived_inputs.py; read as in the original)
 ## NOTE: this Model 4 frame starts from analysis_frame_primary.rds (educ/married/smoke already
 ##   modally imputed), so 2,564 survivors enter the Cox models, whereas model4.R (steps 252-257)
 ##   uses the CSV frame without that imputation and analyses 2,557. Both give 1.48 (1.13-1.93)
@@ -70,7 +71,7 @@ cat("Model 4 terms:", length(coef(m4)), "| rows used:", m4$n, "| events used:", 
 ## (the original also saved analysis_frame_model4.rds and model4_formula.txt; not needed here)
 
 ## ---- step 410 ---------------------------------------------------------------------------------
-RW <- read.csv("supporting/nhanes_dpq_raw.csv")
+RW <- read.csv(file.path(DER, "nhanes_dpq_raw.csv"))
 D  <- merge(subset(H2, inAnalysis==1), RW, by="SEQN", all.x=TRUE)
 D$logt <- log(pmax(D$time,0.05))
 ent <- function(p) 1-sum(-p*log(pmax(p,1e-12)))/(nrow(p)*log(ncol(p)))

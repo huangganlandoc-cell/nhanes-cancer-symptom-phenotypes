@@ -4,7 +4,7 @@
 #   zsh code/run_pipeline.sh              # all stages (several hours; the replicate stages dominate)
 #   zsh code/run_pipeline.sh tables figures
 #
-# Stages: download cohort lca core threestep model4a sensitivity contrasts reconstructed tables figures
+# Stages: download cohort lca core dimensions threestep model4a sensitivity contrasts reconstructed tables figures
 # Several scripts write to review/reproduction/output/ or review/reproduction/harmonised/; the copy
 # steps below put the files that the tables, figures and manuscript use into supporting/.
 # Requirements: R 4.6 (survey, survival, poLCA, rms, nnet); Python 3 with pandas, numpy, matplotlib.
@@ -22,20 +22,14 @@ cp_to() { local dst=$1; shift; for f in "$@"; do cp "$f" "$dst"; done; }
 
 download() { say download; $PY code/download_nhanes.py --out data; }
 
-cohort() { say cohort; $PY code/build_cohort.py; }
+cohort() { say cohort; $PY code/build_cohort.py; $PY code/build_derived_inputs.py; }
 
 lca() {
-  say "latent class models (writes data/derived/lca_fits_cancer.rds if absent)"
+  say "latent class models (writes data/derived/lca_fits_cancer.rds if absent), Model 4 covariates"
   $R code/reconstructed/fit_indices.R > $RO/logs/fit_indices.log 2>&1
   cp $RO/lca_fit_indices_cancer.csv supporting/
   $R code/analysis_bvr.R > $L/bvr.log 2>&1
   $R code/reconstructed/derive_model4_covariates.R > $RO/logs/derive_model4_covariates.log 2>&1
-  $R code/reconstructed/dimensional.R > $RO/logs/dimensional.log 2>&1
-  cp $RO/RR_efa_loadings.csv supporting/
-  if [[ ! -f $RO/intermediate/lca_fits_all_adults.rds ]]; then     # about 30 minutes; measurement only
-    say "latent class model in all adults"; $R code/reconstructed/all_adult_lca.R > $RO/logs/all_adult_lca.log 2>&1
-    cp_to supporting/ $RO/lca_fit_all_adults.csv $RO/RR_fullsample_lca_profiles.csv
-  fi
 }
 
 core() {
@@ -44,6 +38,16 @@ core() {
   cp $RO/full_cohort/analysis_frame.rds data/derived/
   cp $RO/full_cohort/lca_profiles_cancer.csv supporting/
   $R code/analysis_primary_exclNMS.R > $L/primary.log 2>&1
+}
+
+dimensions() {                 # after core: both scripts read data/derived/analysis_frame_primary.rds
+  say "dimension scores and factor analysis"
+  $R code/reconstructed/dimensional.R > $RO/logs/dimensional.log 2>&1
+  cp $RO/RR_efa_loadings.csv supporting/
+  if [[ ! -f $RO/intermediate/lca_fits_all_adults.rds ]]; then     # about 30 minutes; measurement only
+    say "latent class model in all adults"; $R code/reconstructed/all_adult_lca.R > $RO/logs/all_adult_lca.log 2>&1
+    cp_to supporting/ $RO/lca_fit_all_adults.csv $RO/RR_fullsample_lca_profiles.csv
+  fi
 }
 
 threestep() {
@@ -94,6 +98,7 @@ tables() {
 
 figures() { say figures; $PY code/make_figures.py; $PY code/make_figure3.py; }
 
-stages=(${@:-download cohort lca core threestep model4a sensitivity contrasts reconstructed tables figures})
+if (( $# )); then stages=("$@")
+else stages=(download cohort lca core dimensions threestep model4a sensitivity contrasts reconstructed tables figures); fi
 for s in $stages; do $s; done
 say done

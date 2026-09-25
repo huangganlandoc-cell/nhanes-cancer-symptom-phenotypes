@@ -33,7 +33,11 @@
 ## Run   : /opt/homebrew/bin/Rscript code/reconstructed/dimensional.R   (from the project root)
 ## =============================================================================
 suppressPackageStartupMessages({library(survey); library(survival); library(poLCA); library(rms)})
-if (!file.exists("data/derived/nhanes_dimension_scores.csv")) stop("run from the project root")
+if (!dir.exists("data/derived")) stop("run from the project root")
+for (f in c("nhanes_dimension_scores.csv", "nhanes_all_adults_lca_input.csv.gz", "analysis_frame_primary.rds",
+            "nhanes_model4_design_frame.csv.gz"))
+  if (!file.exists(file.path("data/derived", f))) stop("data/derived/", f, " is missing: run the pipeline stages ",
+    "cohort (code/build_derived_inputs.py), lca and core first (see code/run_pipeline.sh)")
 OUT <- "review/reproduction/output"; dir.create(file.path(OUT, "input_checks"), recursive = TRUE, showWarnings = FALSE)
 DER <- "data/derived"; RAWD <- "data/raw_nhanes"
 

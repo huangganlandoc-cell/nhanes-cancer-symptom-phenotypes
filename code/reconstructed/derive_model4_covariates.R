@@ -64,11 +64,16 @@ left_join <- function(x, y, by = "SEQN") {              # pandas merge(how="left
   i <- match(x[[by]], y[[by]]); out <- cbind(x, y[i, setdiff(names(y), by), drop = FALSE]); rownames(out) <- NULL; out }
 yn <- function(v) ifelse(v == 1, 1, ifelse(v == 2, 0, NA))   # 1 = yes, 2 = no, anything else missing
 py_num <- function(x) {                                        # Python repr() of a float, as pandas writes it
-  fmt <- function(v, k) { e <- as.integer(sub(".*e", "", sprintf("%.*e", k - 1L, v)))
-    ifelse(e >= -4 & e < 16, sprintf("%.*f", pmax(k - 1L - e, 1L), v), sprintf("%.*e", k - 1L, v)) }
+  ## repr() is the shortest string that a correctly rounded parser maps back to the same double. R's own
+  ## parser is not always correctly rounded, so Python makes the strings, from 17 significant digits
+  ## (which identify every double exactly).
   s <- ifelse(is.na(x), "", ifelse(x > 0, "inf", "-inf")); i <- which(is.finite(x))
-  for (k in 1:17) { if (!length(i)) break
-    f <- fmt(x[i], k); ok <- k == 17L | as.numeric(f) == x[i]; s[i[ok]] <- f[ok]; i <- i[!ok] }
+  if (length(i)) {
+    tf <- tempfile(); on.exit(unlink(tf)); writeLines(sprintf("%.17g", x[i]), tf)
+    r <- system2(Sys.getenv("PYTHON", "python3"), c("-c", shQuote("import sys\nfor l in sys.stdin: print(repr(float(l)))")),
+                 stdin = tf, stdout = TRUE)
+    stopifnot(length(r) == length(i)); s[i] <- r
+  }
   s }
 py_lines <- function(df) {                                     # lines of pandas DataFrame.to_csv(index=False)
   cols <- lapply(df, function(col) {
