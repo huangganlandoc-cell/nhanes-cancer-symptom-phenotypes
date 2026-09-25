@@ -17,7 +17,7 @@ linked mortality files are downloaded from the CDC by the first stage of the pip
 
 ## Reproducing the analysis
 
-Run from the repository root:
+Run from the repository root (all scripts are in `code/`):
 
 ```bash
 zsh code/run_pipeline.sh

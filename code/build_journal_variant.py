@@ -84,11 +84,11 @@ def rename_section(md, old, new):
 def supplementary_wording(md, style):
     """BMC cites 'Additional file 1: Table S1'; other journals cite 'Supplementary Table S1'."""
     if style == "supplementary":
-        md = md.replace("Additional file 1: Table S", "Supplementary Table S")
-        md = md.replace("Additional file 1: Fig. S", "Supplementary Fig. S")
+        md = re.sub(r"Additional file 1: (Tables?|Figs?\.) S", r"Supplementary \1 S", md)
         md = md.replace("**Additional file 1.**", "**Supplementary Material 1.**")
         md = md.replace("**Additional file 2.**", "**Supplementary Material 2.**")
         md = md.replace("(Additional file 2)", "(Supplementary Material 2)")
+        assert "Additional file" not in md.partition("## Display items")[0], "an Additional file reference survived"
     if style == "nature":
         # Nature Portfolio: one combined Supplementary Information file, and the word "Supplementary"
         # on every mention, including the bare "Table S11" forms the BMC source is free to use.
@@ -120,11 +120,11 @@ def references(md, style, tmp):
 
 # --------------------------------------------------------------------------- variants
 VARIANTS = {
-    "bmc_cancer": dict(folder="BMC_Cancer", journal="BMC Cancer", refs="bmc", abstract="structured",
+    "bmc_cancer": dict(numbering=True, folder="BMC_Cancer", journal="BMC Cancer", refs="bmc", abstract="structured",
                        supp="additional", notes="the source is already in this journal's style"),
     # BMC Public Health: requirements identical to BMC Cancer, but its recent NHANES papers cite
     # "Supplementary Table S1" rather than "Additional file 1: Table S1", so follow that practice
-    "bmc_public_health": dict(folder="BMC_Public_Health", journal="BMC Public Health", refs="bmc",
+    "bmc_public_health": dict(numbering=True, folder="BMC_Public_Health", journal="BMC Public Health", refs="bmc",
                               abstract="structured", supp="supplementary",
                               notes="BMC series format; no public-database clause; supplementary wording"),
     # Scientific Reports: unstructured abstract of 200 words, Nature referencing, no abbreviations
@@ -138,7 +138,7 @@ VARIANTS = {
     # Supportive Care in Cancer (Springer, hybrid): Purpose/Methods/Results/Conclusion abstract of
     # 150-250 words, Springer basic references, and a "Statements and Declarations" block that the
     # journal requires *after* the reference list
-    "supportive_care": dict(folder="Supportive_Care_in_Cancer", journal="Supportive Care in Cancer",
+    "supportive_care": dict(numbering=True, folder="Supportive_Care_in_Cancer", journal="Supportive Care in Cancer",
                             refs="springer", abstract="structured", supp="supplementary",
                             declarations_after_references=True,
                             sections={"Introduction": "Introduction", "Conclusion": "Conclusion"},
@@ -185,7 +185,8 @@ def build(key, out_root=Path("submission")):
     src.write_text(md, encoding="utf-8")
     md = references(md, v["refs"], src)
     combined = v.get("supp_pdf")          # Nature Portfolio wants one supplementary file, preferably PDF
-    title = "Supplementary Information" if combined else "Additional file 1"
+    title = {"nature": "Supplementary Information", "supplementary": "Supplementary Material 1"}.get(v["supp"],
+                                                                                              "Additional file 1")
     prefix = "Supplementary " if combined else ""
     intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S15 and the STROBE checklist for '
              'cohort studies, for "Symptom phenotypes and mortality in US cancer survivors: a '
@@ -215,8 +216,14 @@ def build(key, out_root=Path("submission")):
             writer.add_metadata({"/Title": "06_Supplementary_Information", "/Author": "Yongyong Bao"})
             writer.write(str(out / "06_Supplementary_Information.pdf")); writer.close()
         else:
-            pandoc(strobe.replace("# STROBE checklist", "# Additional file 2. STROBE checklist"),
-                   out / "07_Additional_file_2_STROBE_checklist.docx", "Additional file 2")
+            import fill_strobe_pages
+            text = strobe
+            if v.get("numbering"):             # page numbers exist only in a paginated manuscript
+                text = fill_strobe_pages.fill(strobe, out / "02_Manuscript.docx", si=title)
+            text = supplementary_wording(text, v["supp"])
+            label = "Supplementary Material 2" if v["supp"] == "supplementary" else "Additional file 2"
+            pandoc(text.replace("# STROBE checklist", f"# {label}. STROBE checklist"),
+                   out / "07_Additional_file_2_STROBE_checklist.docx", label)
     for i, f in enumerate(FIGS, start=3):
         shutil.copy(f, out / f"0{i}_Figure_{i - 2}.png")
     letter = Path("manuscript/cover_letters") / f"{key}.md"

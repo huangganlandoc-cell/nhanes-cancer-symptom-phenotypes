@@ -27,10 +27,13 @@ def page_index(docx_path):
             key = cap.group(1) if cap else line
             if key and len(key) < 80:
                 index.setdefault(key.lower(), n)
+            run_in = re.match(r"^([A-Z][A-Za-z ,]{2,60})\.\s", line)   # run-in heading such as "Funding. ..."
+            if run_in:
+                index.setdefault(run_in.group(1).lower(), n)
     return index
 
 
-def resolve(where, index):
+def resolve(where, index, si=SI):
     """'Methods: Statistical analysis; Discussion, final paragraph' -> '5, 9'."""
     if where.strip() in {"-", ""}:
         return "-"
@@ -54,16 +57,17 @@ def resolve(where, index):
         if hit is not None:
             pages.append(hit)
     out = ", ".join(str(p) for p in sorted(set(pages)))
-    return f"{out}; {SI}" if supplementary and out else (SI if supplementary else out)
+    return f"{out}; {si}" if supplementary and out else (si if supplementary else out)
 
 
-def fill(md_text, docx_path):
+def fill(md_text, docx_path, si=SI):
+    """si: how this journal names the supplementary file (e.g. 'Additional file 1')."""
     index = page_index(docx_path)
     out, unresolved = [], []
     for line in md_text.split("\n"):
         cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.startswith("|") else None
         if cells and len(cells) == 5 and cells[0] not in {"Item", "---"}:
-            cells[4] = resolve(cells[3], index)
+            cells[4] = resolve(cells[3], index, si)
             if not cells[4]:
                 unresolved.append(cells[0])
             line = "| " + " | ".join(cells) + " |"

@@ -13,10 +13,12 @@ Sys.setenv(OPENBLAS_NUM_THREADS = "1", OMP_NUM_THREADS = "1", VECLIB_MAXIMUM_THR
 rscript <- file.path(R.home("bin"), "Rscript")
 scripts <- c("model4_harmonised", "dimensional_harmonised", "all_adult_lca_pseudoclass_harmonised",
              "proportional_hazards_fulldesign", "diagnostics_harmonised")
+failed <- character(0)
 for (s in scripts) {
   t0 <- Sys.time(); cat(sprintf("%-40s ... ", s))
   lf <- file.path(LOG, paste0(s, ".log"))
   st <- system2(rscript, file.path("code/reconstructed/harmonised", paste0(s, ".R")), stdout = lf, stderr = lf)
+  if (st != 0) failed <- c(failed, s)
   cat(if (st == 0) "ok" else paste("FAILED (exit", st, ") - see log"),
       sprintf("(%.1f min)\n", as.numeric(difftime(Sys.time(), t0, units = "mins"))))
 }
@@ -26,4 +28,6 @@ write.csv(do.call(rbind, lapply(fs, read.csv, colClasses = "character")),
           "review/reproduction/harmonised/analysed_n_all.csv", row.names = FALSE)
 system2(rscript, "code/reconstructed/harmonised/compare_harmonised.R",
         stdout = file.path(LOG, "compare_harmonised.log"), stderr = file.path(LOG, "compare_harmonised.log"))
-cat("comparison written to review/reproduction/harmonised/value_changes.csv\n")
+cat("comparison written to review/reproduction/harmonised/value_changes.csv",
+    "(it compares with earlier outputs and needs files that the pipeline does not write; its failure is not fatal)\n")
+if (length(failed)) stop("failed: ", paste(failed, collapse = ", "))
