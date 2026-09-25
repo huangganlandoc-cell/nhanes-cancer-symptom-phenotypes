@@ -26,6 +26,7 @@ Notes
 import argparse
 import io
 import os
+import time
 
 import pandas as pd
 import requests
@@ -50,9 +51,25 @@ MORT_NAMES = ["SEQN", "ELIGSTAT", "MORTSTAT", "UCOD_LEADING", "DIABETES",
               "HYPERTEN", "_r1", "_r2", "_r3", "_r4", "PERMTH_INT", "PERMTH_EXM"]
 
 
+def get(url, timeout, tries=5):
+    """requests.get with retries: a dropped connection or a server error is retried after a pause."""
+    for k in range(1, tries + 1):
+        try:
+            r = requests.get(url, timeout=timeout)
+            if r.status_code < 500:
+                return r
+            err = f"HTTP {r.status_code}"
+        except requests.exceptions.RequestException as e:
+            err = type(e).__name__
+        if k < tries:
+            print(f"   retry {k} after {err}: {url}")
+            time.sleep(10 * k)
+    raise RuntimeError(f"download failed after {tries} attempts ({err}): {url}")
+
+
 def fetch_xpt(year, module, suffix, timeout=240):
     url = NHANES_URL.format(year=year, module=module, suffix=suffix)
-    r = requests.get(url, timeout=timeout)
+    r = get(url, timeout)
     if r.status_code != 200:
         return None, url
     return pd.read_sas(io.BytesIO(r.content), format="xport"), url
@@ -60,7 +77,7 @@ def fetch_xpt(year, module, suffix, timeout=240):
 
 def fetch_mortality(year, timeout=180):
     url = MORT_URL.format(y=year, y2=year + 1)
-    r = requests.get(url, timeout=timeout)
+    r = get(url, timeout)
     r.raise_for_status()
     return pd.read_fwf(io.StringIO(r.text), colspecs=MORT_COLSPECS, names=MORT_NAMES)
 
