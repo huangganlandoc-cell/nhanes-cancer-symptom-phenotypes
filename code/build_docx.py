@@ -157,7 +157,10 @@ S9_MODELS = {"1 phenotype only": "A. Phenotype only", "2 PHQ-9 continuous only":
 CELL_TEXT = [("I(phq9_score/5)", "PHQ-9 score (per 5 points)"), ("JKn", "jackknife"), ("chi2=", "\u03c7\u00b2 = "),
              ("kg/m2", "kg/m\u00b2"), ("NH White", "Non-Hispanic White"), ("NH Black", "Non-Hispanic Black"),
              ("report a sleep complaint", "with previously reported sleep trouble"), (" since dx", " since diagnosis"),
-             ("subscale AFF", "subscale affective"), ("subscale SOM", "subscale somatic"), (">=", "\u2265"), ("<=", "\u2264")]
+             ("subscale AFF", "subscale affective"), ("subscale SOM", "subscale somatic"),
+             ("CVD/stroke", "Cardiovascular or cerebrovascular"), ("Cardiovascular or stroke", "Cardiovascular or cerebrovascular"),
+             ("time-varying phenotype effect", "time-varying phenotype association"),
+             ("exposure satisfies PH", "phenotype meets the proportional hazards assumption"), (">=", "\u2265"), ("<=", "\u2264")]
 
 
 def _sci(x, digits=2):

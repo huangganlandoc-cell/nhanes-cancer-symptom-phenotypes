@@ -53,10 +53,21 @@ def fmt_authors(authors, style):
     return ", ".join(names) + tail
 
 
+def pages(pg):
+    """Full page ranges with an en dash, one form throughout: 1797-810 -> 1797\u20131810, e458-e466 -> e458\u2013e466."""
+    m = re.fullmatch(r"([A-Za-z]*)(\d+)[-\u2013]([A-Za-z]*)(\d+)(.*)", pg or "")
+    if not m:
+        return pg
+    p1, a, p2, b, rest = m.groups()
+    if not p2 and len(b) < len(a):
+        b = a[:len(a) - len(b)] + b
+    return f"{p1}{a}\u2013{p2}{b}{rest}"
+
+
 def fmt(rec, style):
     au = fmt_authors(rec["authors"], style)
     vol, iss, pg, yr = rec["volume"], rec["issue"], rec["pages"], rec["year"]
-    pg = re.sub(r"(?<=\d)-(?=\d)", "\u2013", pg)          # page ranges take an en dash
+    pg = pages(pg)
     if style == "bmc":
         loc = yr + (f";{vol}" + (f"({iss})" if iss else "") + (f":{pg}" if pg else "") if vol else (f":{pg}" if pg else ""))
         doi = f" https://doi.org/{rec['doi']}" if rec["doi"] else ""
