@@ -3,6 +3,8 @@
 Analysis code for the manuscript *Symptom phenotypes and mortality in US cancer survivors: a
 cohort study* (NHANES 2005–2018 with NCHS linked mortality follow-up through 2019).
 
+Archived at Zenodo: https://doi.org/10.5281/zenodo.22970535 (this DOI always resolves to the newest version; each version has its own DOI on the Zenodo page). The code is released under the MIT License.
+
 The repository contains code only. It contains no NHANES data: the survey files and the public-use
 linked mortality files are downloaded from the CDC by the first stage of the pipeline.
 
@@ -47,12 +49,16 @@ control the number of worker processes; the pipeline keeps each process to one B
 
 ## Notes
 
-- Reproducibility (checked on 25 September 2026 with a fresh download): the raw files, the cohort design
-  frame, the all-adult input, the raw item scores and the Model 4 covariates are identical to the files the
-  analysis used (compared after decompression). The Model 4 design frame differs only in years since
-  diagnosis, corrected in `build_cohort.py`; the analyses take that variable from the cohort frame. The
-  somatic residual in the dimension scores is identical with statsmodels 0.14.6 and numpy 2.4.6 and
-  differs by up to 2e-13 with other versions.
+- Reproducibility (checked on 25 September 2026): `zsh code/run_pipeline.sh` in a fresh clone, with a
+  fresh download, ran every stage in 1 h 46 min on 18 cores (macOS, R 4.6.1, Python 3.14). Every table
+  (Tables 1-4, S1-S15) and every analysis output behind them, including the jackknife and bootstrap
+  replicates of the three-step correction, was byte-identical to the files used for the manuscript, and
+  every figure was byte-identical when drawn with matplotlib 3.11.0. The exceptions are at the level of
+  floating-point rounding: the somatic residual in the dimension scores (identical with statsmodels 0.14.6
+  and numpy 2.4.6, up to 4e-12 relative with statsmodels 0.15.0) and the standard errors of the latent
+  class item probabilities, which no script uses. The Model 4 design frame differs from the original file
+  only in years since diagnosis, corrected in `build_cohort.py`; the analyses take that variable from the
+  cohort frame.
 
 - `code/reconstructed/` holds scripts rebuilt from the interactive session in which those analyses
   were first run, each checked against the saved outputs; `compare_outputs.R` and
