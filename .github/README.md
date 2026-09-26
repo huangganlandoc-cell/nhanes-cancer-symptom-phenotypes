@@ -3,6 +3,8 @@
 Analysis code for the manuscript *Symptom phenotypes and mortality in US cancer survivors: a
 cohort study* (NHANES 2005–2018 with NCHS linked mortality follow-up through 2019).
 
+Archived at Zenodo: https://doi.org/10.5281/zenodo.22970535 (this DOI always resolves to the newest version; each version has its own DOI on the Zenodo page). The code is released under the MIT License.
+
 The repository contains code only. It contains no NHANES data: the survey files and the public-use
 linked mortality files are downloaded from the CDC by the first stage of the pipeline.
 

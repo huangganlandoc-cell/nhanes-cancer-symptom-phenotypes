@@ -6,6 +6,7 @@ version: 1.0.0
 date-released: "2026-09-25"
 license: MIT
 repository-code: "https://github.com/huangganlandoc-cell/nhanes-cancer-symptom-phenotypes"
+doi: "10.5281/zenodo.22970535"
 authors:
   - family-names: Zhang
     given-names: Rui

@@ -68,7 +68,7 @@ def fmt(rec, style):
         return f"{au} {rec['title']}. *{rec['journal']}* {loc} ({yr}).{doi}".replace("  ", " ")
     loc = (f"{vol}:{pg}" if vol and pg else vol or pg)
     doi = f". https://doi.org/{rec['doi']}" if rec["doi"] else ""
-    return f"{au} ({yr}) {rec['title']}. {rec['journal']} {loc}{doi}"
+    return f"{au} ({yr}) {rec['title']}. {rec['journal']}{' ' + loc if loc else ''}{doi}"
 
 
 def main():
