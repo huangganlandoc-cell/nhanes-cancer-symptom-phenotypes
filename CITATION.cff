@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite it as below."
+title: "Analysis code for \"Symptom phenotypes and mortality in US cancer survivors: a cohort study\""
+type: software
+version: 1.0.0
+date-released: "2026-09-25"
+license: MIT
+repository-code: "https://github.com/huangganlandoc-cell/nhanes-cancer-symptom-phenotypes"
+authors:
+  - family-names: Zhang
+    given-names: Rui
+    affiliation: "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+  - family-names: Huang
+    given-names: Tao
+    affiliation: "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+  - family-names: Bao
+    given-names: Yongyong
+    affiliation: "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+keywords:
+  - cancer survivorship
+  - symptom clusters
+  - latent class analysis
+  - depressive symptoms
+  - mortality
+  - NHANES
+  - survey-weighted Cox regression
+  - three-step estimator

@@ -1,5 +1,5 @@
 # ── 默认忽略仓库里的一切 ──────────────────────────────
-# 本仓库只收录 code/ 下的分析脚本。
+# 本仓库只收录 code/ 下的分析脚本，以及根目录的 LICENSE、CITATION.cff、.zenodo.json（Zenodo 存档元数据）。
 # 数据（data/）、稿件（manuscript/）、投稿信、内部改稿记录（TODO.md、
 # review/、supporting/）一律不进版本库，即使误用 `git add -A` 也不会被收进来。
 /*
@@ -8,6 +8,9 @@
 !/.gitignore
 !/code/
 !/.github/
+!/LICENSE
+!/.zenodo.json
+!/CITATION.cff
 
 # ── code/ 内部仍要排除的 ──────────────────────────────
 /code/__pycache__/

@@ -1,0 +1,33 @@
+{
+  "title": "Analysis code for \"Symptom phenotypes and mortality in US cancer survivors: a cohort study\"",
+  "upload_type": "software",
+  "description": "<p>Analysis code for the manuscript <em>Symptom phenotypes and mortality in US cancer survivors: a cohort study</em> (National Health and Nutrition Examination Survey 2005-2018 with NCHS linked mortality follow-up through 2019).</p><p>The code downloads the public NHANES files and the NCHS public-use linked mortality files, assembles the cohort of adult cancer survivors, fits the latent class models of the nine PHQ-9 items, sleep duration and previously reported sleep trouble, estimates survey-weighted Cox models with modal class assignment and with a maximum-likelihood three-step correction for misclassification (jackknife and bootstrap replicates that repeat all three steps), runs every sensitivity analysis reported, and builds every table and figure. <code>zsh code/run_pipeline.sh</code> runs all stages in order; <code>code/README.md</code> lists the stages and requirements (R 4.6 with survey, survival, poLCA, rms and nnet; Python 3.11 or later with pandas, numpy, statsmodels, matplotlib and requests).</p><p>The archive contains code only; no NHANES data are included. In a check on 25 September 2026, the pipeline run in a fresh clone with a fresh download from the CDC reproduced every table of the manuscript byte for byte, and every figure byte for byte when drawn with matplotlib 3.11.0 (details in <code>code/README.md</code>).</p>",
+  "notes": "Data sources: NHANES 2005-2018 public-use data files (https://wwwn.cdc.gov/nchs/nhanes/) and the NCHS public-use linked mortality files with follow-up through 31 December 2019 (https://www.cdc.gov/nchs/linked-data/mortality-files/). The data are not redistributed in this archive; code/download_nhanes.py retrieves them from the CDC. Their use is governed by the NCHS Data User Agreement (https://www.cdc.gov/nchs/policy/data-user-agreement.html), not by the MIT License of the code.",
+  "creators": [
+    {
+      "name": "Zhang, Rui",
+      "affiliation": "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+    },
+    {
+      "name": "Huang, Tao",
+      "affiliation": "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+    },
+    {
+      "name": "Bao, Yongyong",
+      "affiliation": "Department of Breast Disease, Henan Breast Cancer Center, The Affiliated Cancer Hospital of Zhengzhou University & Henan Cancer Hospital, Zhengzhou 450000, China"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "cancer survivorship",
+    "symptom clusters",
+    "latent class analysis",
+    "depressive symptoms",
+    "mortality",
+    "NHANES",
+    "survey-weighted Cox regression",
+    "three-step estimator"
+  ],
+  "language": "eng"
+}
