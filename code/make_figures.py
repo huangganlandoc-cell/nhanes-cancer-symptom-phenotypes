@@ -1,6 +1,6 @@
 """Figures 1 and 2 and Additional file 1: Figs. S1-S3, drawn from the saved outputs in supporting/.
 
-Figure 1: item-endorsement profiles and weighted prevalence of the four phenotypes
+Figure 1: item-endorsement profiles of the four phenotypes and the weighted share assigned to each
           (supporting/lca_profiles_cancer.csv, supporting/P_lca_prevalence.csv).
 Figure 2: survey-weighted Kaplan-Meier curves (supporting/P_km_curves.csv).
 Fig. S1 : participant flow. Counts as printed by code/build_cohort.py; deaths and person-years of
@@ -86,8 +86,8 @@ for i, L in enumerate(LB[::-1]):
     ax2.plot([lo, hi], [i, i], color=CL[L], lw=1.4); ax2.plot(v, i, "o", color=CL[L], ms=5)
     ax2.text(v + 4, i, f"{v:.1f}%", ha="left", va="center", color=CL[L])
 ax2.set_yticks(range(4)); ax2.set_yticklabels([]); ax2.set_xlim(0, 95); ax2.set_ylim(-0.5, 3.5)
-ax2.set_xlabel("Weighted prevalence (%)")
-ax2.set_title("Population prevalence", loc="left")
+ax2.set_xlabel("Share of survivors (%)")
+ax2.set_title("Weighted share assigned", loc="left")
 fig1.savefig(f"{FIG}/Figure1_symptom_phenotypes.png", dpi=300, bbox_inches="tight")
 
 # ------------------------------------------------------------------ Figure 2
@@ -99,7 +99,7 @@ for L in LB:
             label=L, zorder=4 if L == "Somatic-depressive" else 2)
 ax.set_xlabel("Years since examination"); ax.set_ylabel("Survival (%)")
 ax.set_xlim(0, 15); ax.set_ylim(40, 101); ax.margins(0.02)
-ax.set_title("The somatic-depressive phenotype has\nthe lowest survival", loc="left")
+ax.set_title("Weighted survival by phenotype\n(unadjusted)", loc="left")
 ax.legend(frameon=False, loc="lower left", handlelength=1.4, labelspacing=.35)
 ax.text(14.6, 99.5, "survey-weighted", ha="right", va="top", color=META_GREY, fontsize=6)
 fig2.savefig(f"{FIG}/Figure2_survival_curves.png", dpi=300, bbox_inches="tight")

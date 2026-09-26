@@ -6,8 +6,8 @@
 ## are refitted with modal assignment, as for the other measurement sensitivity analyses
 ## (code/reconstructed/measurement_sensitivity_RR4.R).
 ## Run from the project root: Rscript code/analysis_drop_slq050.R
-## Outputs: supporting/RR6_drop_slq050_{fit,profiles,crosstab,cox}.csv
-suppressPackageStartupMessages({library(poLCA); library(survey); library(survival)})
+## Outputs: supporting/RR6_drop_slq050_{fit,profiles,crosstab,cox,fixed_score}.csv
+suppressPackageStartupMessages({library(poLCA); library(survey); library(survival); library(rms)})
 options(survey.lonely.psu = "adjust")
 DER <- "data/derived"; OUT <- "supporting"
 
@@ -77,6 +77,25 @@ for (m in c("C3", "C4a", "C4")) {
 }
 cox <- do.call(rbind, rows)
 print(transform(cox, HR95 = sprintf("%.2f (%.2f-%.2f)", HR, lo, hi))[, c("model", "term", "HR95", "p")], row.names = FALSE)
+
+## the phenotype contrasts with the summed PHQ-9 score in the model, as in
+## code/analysis_fixed_score_contrast.R for the main solution (modal assignment; post hoc, 2026-09-26)
+fs <- list()
+for (m in c("C3", "C4a")) for (sev in c("I(phq9_score/5)", "rcs(phq9_score,4)")) {
+  sv <- svycoxph(as.formula(paste("Surv(time, event) ~ new +", sev, "+", get(m))), design = P)
+  for (k in list(c("newSomatic-depressive", "", "somatic-depressive vs low symptom burden"),
+                 c("newSomatic-depressive", "newSleep-fatigue", "somatic-depressive vs sleep-fatigue"))) {
+    w <- setNames(rep(0, length(coef(sv))), names(coef(sv))); w[k[1]] <- 1; if (nzchar(k[2])) w[k[2]] <- -1
+    ct <- svycontrast(sv, w); b <- as.numeric(coef(ct)); se <- as.numeric(SE(ct))
+    fs[[length(fs) + 1]] <- data.frame(model = c(C3 = "Model 3", C4a = "Model 4a")[m],
+      severity = c("I(phq9_score/5)" = "PHQ-9 score, linear per 5 points", "rcs(phq9_score,4)" = "PHQ-9 score, 4-knot spline")[sev],
+      contrast = k[3], HR = exp(b), lo = exp(b - 1.96 * se), hi = exp(b + 1.96 * se), p = 2 * pnorm(-abs(b / se)),
+      n = sv$n, deaths = sv$nevent, row.names = NULL)
+  }
+}
+fs <- do.call(rbind, fs)
+print(transform(fs, HR95 = sprintf("%.2f (%.2f-%.2f)", HR, lo, hi))[, c("model", "severity", "contrast", "HR95", "p")], row.names = FALSE)
+write.csv(fs, file.path(OUT, "RR6_drop_slq050_fixed_score.csv"), row.names = FALSE)
 
 write.csv(cbind(fitstat, cramer_v_4class = c(NA, V, NA), agreement_4class = c(NA, agree, NA)),
           file.path(OUT, "RR6_drop_slq050_fit.csv"), row.names = FALSE)

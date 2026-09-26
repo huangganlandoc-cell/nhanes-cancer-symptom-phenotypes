@@ -89,6 +89,17 @@ def supplementary_wording(md, style):
         md = md.replace("**Additional file 2.**", "**Supplementary Material 2.**")
         md = md.replace("(Additional file 2)", "(Supplementary Material 2)")
         assert "Additional file" not in md.partition("## Display items")[0], "an Additional file reference survived"
+    if style == "wiley":
+        # Wiley (Cancer Medicine): supporting files are Data S1 (figures and tables) and Data S2 (STROBE);
+        # in the text items are cited as "Table S1" and "Figure S1" without a file prefix
+        md = re.sub(r"Additional file 1: Tables S", "Tables S", md)
+        md = re.sub(r"Additional file 1: Table S", "Table S", md)
+        md = re.sub(r"Additional file 1: Figs?\. S", "Figure S", md)
+        md = md.replace("(Additional file 2)", "(Data S2)")
+        body, sep, manifest = md.partition("## Display items")
+        body = re.sub(r"(?<![A-Za-z])Fig\. (S\d)", r"Figure \1", body)
+        assert "Additional file" not in body, "an Additional file reference survived the Wiley transform"
+        md = body + sep + manifest
     if style == "nature":
         # Nature Portfolio: one combined Supplementary Information file, and the word "Supplementary"
         # on every mention, including the bare "Table S11" forms the BMC source is free to use.
@@ -135,6 +146,19 @@ VARIANTS = {
                                numbering=True, supp_pdf=True,
                                notes="Nature Portfolio format; main text capped at 4,500 words"),
 
+    # Cancer Medicine (Wiley, open access): free-format submission (any consistent reference style); title
+    # without abbreviations; 4 keywords (the guideline says both 1-4 and 4-6); structured abstract
+    # Background/Methods/Results/Conclusion; Wiley end statements; supporting files Data S1 and Data S2.
+    # The text is the Scientific Reports version (same shortening edits), so the two packages agree.
+    "cancer_medicine": dict(numbering=True, folder="Cancer_Medicine", journal="Cancer Medicine", refs="bmc",
+                            abstract="override", supp="wiley", edits_from="scientific_reports",
+                            drop_sections=["Supplementary information", "List of abbreviations"],
+                            title="Symptom Phenotypes and Mortality in United States Cancer Survivors: A Cohort Study",
+                            keywords="cancer survivorship; latent class analysis; depressive symptoms; mortality",
+                            supp_file="06_Data_S1_Supporting_Information.docx",
+                            strobe_file="07_Data_S2_STROBE_checklist.docx",
+                            notes="Wiley format; no word limit for original research; APC USD 4,970"),
+
     # Supportive Care in Cancer (Springer, hybrid): Purpose/Methods/Results/Conclusion abstract of
     # 150-250 words, Springer basic references, and a "Statements and Declarations" block that the
     # journal requires *after* the reference list
@@ -161,7 +185,14 @@ def build(key, out_root=Path("submission")):
         md = rename_abstract_heads(md, v["abstract"])
     for old, new in v.get("sections", {}).items():
         md = rename_section(md, old, new)
-    edits = Path("manuscript/variant_edits") / f"{key}.json"
+    if v.get("title"):            # a journal-specific title (e.g. no abbreviations, Title Case)
+        first, _, rest = md.partition("\n")
+        assert first.startswith("# "), first
+        md = f"# {v['title']}\n" + rest
+    if v.get("keywords"):
+        md, n = re.subn(r"^\*\*Keywords\*\*: .*$", "**Keywords**: " + v["keywords"], md, count=1, flags=re.M)
+        assert n == 1, "no Keywords line"
+    edits = Path("manuscript/variant_edits") / f"{v.get('edits_from', key)}.json"
     if edits.exists():             # sentences this journal's limits force us to shorten; source untouched
         for a, b in json.loads(edits.read_text(encoding="utf-8")):
             assert md.count(a) == 1, f"variant edit not unique ({md.count(a)}): {a[:60]!r}"
@@ -169,7 +200,9 @@ def build(key, out_root=Path("submission")):
     for head in v.get("drop_sections", []):
         i = md.index(f"## {head}")
         j = md.index("\n## ", i + 3)
-        md = md[:md.rindex("\n---\n", 0, i) + 1 if "\n---\n" in md[:i] else i] + md[j + 1:]
+        k = md.rfind("\n---\n", 0, i)          # drop the rule directly above the section, and nothing else
+        start = k + 1 if k >= 0 and not md[k + 5:i].strip() else i
+        md = md[:start] + md[j + 1:]
     md = supplementary_wording(md, v["supp"])
     decl = Path("manuscript/declarations") / f"{key}.md"
     tail = None
@@ -185,7 +218,8 @@ def build(key, out_root=Path("submission")):
     src.write_text(md, encoding="utf-8")
     md = references(md, v["refs"], src)
     combined = v.get("supp_pdf")          # Nature Portfolio wants one supplementary file, preferably PDF
-    title = {"nature": "Supplementary Information", "supplementary": "Supplementary Material 1"}.get(v["supp"],
+    title = {"nature": "Supplementary Information", "supplementary": "Supplementary Material 1",
+             "wiley": "Data S1. Supporting Information"}.get(v["supp"],
                                                                                               "Additional file 1")
     prefix = "Supplementary " if combined else ""
     intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S15 and the STROBE checklist for '
@@ -193,7 +227,7 @@ def build(key, out_root=Path("submission")):
              'cohort study".') if combined else None
     strobe = Path("supporting/STROBE_checklist_EN.md").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmp_dir:
-        supp = Path(tmp_dir) / "Supplementary_Information.docx" if combined else out / "06_Additional_file_1.docx"
+        supp = Path(tmp_dir) / "Supplementary_Information.docx" if combined else out / v.get("supp_file", "06_Additional_file_1.docx")
         subprocess.run([sys.executable, "-c",
                         "import sys; sys.path.insert(0, 'code'); import build_docx; "
                         f"build_docx.build({str(src)!r}, {str(out / '02_Manuscript.docx')!r}, tail_md={tail!r}, "
@@ -219,11 +253,11 @@ def build(key, out_root=Path("submission")):
             import fill_strobe_pages
             text = strobe
             if v.get("numbering"):             # page numbers exist only in a paginated manuscript
-                text = fill_strobe_pages.fill(strobe, out / "02_Manuscript.docx", si=title)
+                text = fill_strobe_pages.fill(strobe, out / "02_Manuscript.docx", si="Data S1" if v["supp"] == "wiley" else title)
             text = supplementary_wording(text, v["supp"])
-            label = "Supplementary Material 2" if v["supp"] == "supplementary" else "Additional file 2"
+            label = {"supplementary": "Supplementary Material 2", "wiley": "Data S2"}.get(v["supp"], "Additional file 2")
             pandoc(text.replace("# STROBE checklist", f"# {label}. STROBE checklist"),
-                   out / "07_Additional_file_2_STROBE_checklist.docx", label)
+                   out / v.get("strobe_file", "07_Additional_file_2_STROBE_checklist.docx"), label)
     for i, f in enumerate(FIGS, start=3):
         shutil.copy(f, out / f"0{i}_Figure_{i - 2}.png")
     letter = Path("manuscript/cover_letters") / f"{key}.md"

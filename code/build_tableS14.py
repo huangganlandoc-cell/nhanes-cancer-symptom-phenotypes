@@ -1,8 +1,9 @@
 """Supplementary Tables S14 and S15 (post hoc analyses added after an internal review of the design).
 
 S14: Model 4a (code/analysis_model4a.R), the measurement model without SLQ050
-     (code/analysis_drop_slq050.R) and the phenotype contrast at a fixed PHQ-9 score
-     (code/analysis_fixed_score_contrast.R) -> supplementary/TableS14_model4a_drop_slq050.csv
+     (code/analysis_drop_slq050.R) and the phenotype contrast at a fixed PHQ-9 score in the main
+     solution (code/analysis_fixed_score_contrast.R) and in the solution without SLQ050
+     (code/analysis_drop_slq050.R) -> supplementary/TableS14_model4a_drop_slq050.csv
 S15: survivors excluded for incomplete symptom data versus those included
      (code/analysis_excluded_comparison.R) -> supplementary/TableS15_excluded_vs_included.csv
 Run from the project root after those scripts.
@@ -42,6 +43,9 @@ for r in rows("RR6_drop_slq050_cox.csv"):
 for r in rows("RR7_fixed_score_contrast.csv"):
     add("C. Phenotype contrasts with the summed PHQ-9 score in the model", covname[r["model"]],
         f"modal class assignment; {r['severity']}", r["contrast"], r)
+for r in rows("RR6_drop_slq050_fixed_score.csv"):
+    add("D. Phenotype contrasts with the summed PHQ-9 score in the model, measurement model without SLQ050",
+        covname[r["model"]], f"modal class assignment; {r['severity']}", r["contrast"], r)
 
 fit = rows("RR6_drop_slq050_fit.csv")
 f4 = next(r for r in fit if r["classes"] == "4")
