@@ -10,6 +10,16 @@ import re, subprocess, sys, tempfile
 from pathlib import Path
 
 SI = "Supplementary Information"
+# "Where reported" entries that name a paragraph rather than a heading are located by a sentence in that paragraph
+# (matched case-insensitively in the paginated text); the checklist itself shows only the entry.
+ANCHORS = {
+    "introduction, final paragraph": ["we therefore applied latent class analysis"],
+    "methods: statistical analysis, required sample size": ["required sample size for a confirmatory study"],
+    "discussion, final paragraph": ["detecting it with 80% power"],
+    "discussion, penultimate paragraphs": ["this study has several limitations"],
+    "results: cohort characteristics, excluded survivors": ["excluded for incomplete symptom data"],
+    "discussion, comparison with the prior classification": ["reproducing the classification of lan"],
+}
 
 
 def page_index(docx_path):
@@ -20,7 +30,7 @@ def page_index(docx_path):
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         pdf = Path(tmp) / (Path(docx_path).stem + ".pdf")
         pages = [p.extract_text() for p in PdfReader(str(pdf)).pages]
-    index = {}
+    index = {"\x00pages": [re.sub(r"\s+", " ", p.replace("-\n", "")).lower() for p in pages]}
     for n, text in enumerate(pages, start=1):
         for line in (l.strip() for l in text.split("\n")):
             cap = re.match(r"^((?:Figure|Table) \d+)\.", line)
@@ -39,6 +49,17 @@ def resolve(where, index, si=SI):
         return "-"
     pages, supplementary = [], False
     for token in where.split(";"):
+        anchors = ANCHORS.get(token.strip().lower())
+        if anchors:
+            texts = index["\x00pages"]
+            for anchor in anchors:
+                hit = next((n for n, p in enumerate(texts, start=1) if anchor in p), None)
+                if hit is None:                  # sentence split across a page break: its opening words
+                    head = " ".join(anchor.split()[:4])
+                    hit = next((n for n, p in enumerate(texts, start=1) if head in p), None)
+                if hit is not None:
+                    pages.append(hit)
+            continue
         t = re.sub(r"^(Methods|Results|Discussion|Declarations):\s*", "", token.strip())
         t = t.split(",")[0].strip()
         t = re.sub(r"\s*\(.*\)$", "", t)

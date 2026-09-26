@@ -146,7 +146,7 @@ _ENOTE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)[eE]([-+]?\d+)(?![\w.])")
 HEADERS = {"k": "Classes", "logLik": "Log-likelihood", "entropy": "Entropy", "min_class_pct": "Smallest class (%)",
            "subgroup": "Subgroup", "events": "Deaths", "p": "P", "p_bh": "BH-adjusted P",
            "joint_p_phenotype": "Joint P, phenotype", "joint_p_11_indicators": "Joint P, 11 indicators",
-           "Pearson X2": "Pearson \u03c7\u00b2"}
+           "Pearson X2": "Pearson \u03c7\u00b2", "BVR": "Bivariate residual"}
 TABLE_HEADERS = {"Table S2": {"model": "Covariate set", "term": "Phenotype"},
                  "Table S8": {"": "Indicator"},
                  "Table S9": {"model": "Model", "term": "Term"}}
@@ -156,29 +156,66 @@ S9_MODELS = {"1 phenotype only": "A. Phenotype only", "2 PHQ-9 continuous only":
              "6 all 11 indicators + phenotype": "E. Phenotype + all 11 indicators"}
 CELL_TEXT = [("I(phq9_score/5)", "PHQ-9 score (per 5 points)"), ("JKn", "jackknife"), ("chi2=", "\u03c7\u00b2 = "),
              ("kg/m2", "kg/m\u00b2"), ("NH White", "Non-Hispanic White"), ("NH Black", "Non-Hispanic Black"),
-             ("report a sleep complaint", "reported previous sleep trouble"), (">=", "\u2265"), ("<=", "\u2264")]
+             ("report a sleep complaint", "with previously reported sleep trouble"), (" since dx", " since diagnosis"),
+             ("subscale AFF", "subscale affective"), ("subscale SOM", "subscale somatic"), (">=", "\u2265"), ("<=", "\u2264")]
 
 
-def _sci(x):
-    mant, exp = f"{x:.1e}".split("e")
+def _sci(x, digits=2):
+    mant, exp = f"{x:.{digits - 1}e}".split("e")
     return f"{mant} \u00d7 10{str(int(exp)).translate(_SUP)}"
+
+
+def _sig(s):
+    """Significant digits written in the source string (0.0006 -> 1, 6.3e-04 -> 2), at most 2."""
+    m = s.lower().split("e")[0].replace("-", "").replace(".", "").lstrip("0")
+    return max(1, min(2, len(m)))
 
 
 def _is_p(header):
     return header in ("P", "p", "p_bh") or header.endswith(" P") or header.startswith(("Joint P", "joint_p"))
 
 
+def _p1(s):
+    x = float(s)
+    return _sci(x, _sig(s)) if 0 < x < 0.001 else (f"{x:.3f}" if 0 <= x <= 1 else s)
+
+
+_PNUM = r"(\d\.\d{4,}|\d(?:\.\d+)?[eE]-\d+)"
+
+
 def _p(cell):
     try:
-        x = float(cell)
-    except ValueError:
-        return cell
-    return _sci(x) if 0 < x < 0.001 else (f"{x:.3f}" if 0 <= x <= 1 else cell)
+        return _p1(cell)
+    except ValueError:                           # e.g. "0.5393 (0.0348 when fitted alone)"
+        return re.sub(r"(?<![\d.])" + _PNUM + r"(?![\d])", lambda m: _p1(m.group(1)), cell)
 
 
-def _text(cell):
+S5_LABELS = [("Model 4: + comorbidity and frailty block", "Model 4 without antidepressant use"),
+             ("Model 4b: individual conditions + antidepressant", "Model 4 with the seven conditions entered individually"),
+             ("Model 4b individual conditions", "Model 4 with the seven conditions entered individually"),
+             ("Model 4 + antidepressant use", "Model 4"), ("Model 4 + antidepressant (new primary)", "Model 4"),
+             ("Model 4 + antidepressant", "Model 4"), ("Model 4 + antidep", "Model 4"),
+             ("Model 3 (previous primary)", "Model 3"),
+             ("Model 4 + pseudo-class (most conservative)", "Model 4, symptom-based pseudo-class draws"),
+             ("Assignment-uncertainty correction under Model 4 (100 draws)",
+              "Symptom-based pseudo-class draws under Model 4 (100 draws)"),
+             ("under assignment correction", "with symptom-based pseudo-class draws")]
+
+
+def _text(cell, key=None):
+    if key == "Table S5":                        # labels as the manuscript defines Model 4 (antidepressant use included)
+        for a, b in S5_LABELS:
+            cell = cell.replace(a, b)
+        cell = re.sub(r"(-?\d+(?:\.\d+)?)% of excess risk removed",
+                      lambda m: (f"excess hazard (HR \u2212 1) {abs(float(m.group(1))):g}% "
+                                 + ("smaller" if float(m.group(1)) >= 0 else "larger")), cell)
     for a, b in CELL_TEXT:
         cell = cell.replace(a, b)
+    cell = re.sub(r"\b((?:joint |design-based joint Wald |joint Wald |Wald )?P|BH|Bonferroni)( =)? " + _PNUM,
+                  lambda m: f"{m.group(1)}{m.group(2) or ''} {_p1(m.group(3))}", cell)
+    cell = re.sub(r"(?<=[A-Za-z]) x (?=[A-Za-z])", " \u00d7 ", cell)       # age group x years -> age group × years
+    cell = re.sub(r"(?<=\d)x(?= )", "\u00d7", cell)                        # 66.6x current sample -> 66.6× ...
+    cell = re.sub(r"\b([kn])=(\d)", r"\1 = \2", cell)
     cell = _ENOTE.sub(lambda m: _sci(float(m.group(0))) if float(m.group(0)) < 0.001 else m.group(0), cell)
     cell = re.sub(r"(?<=\d) py\b", " person-years", cell)
     cell = re.sub(r"(?<=\d)-(?=\d)", "\u2013", cell)            # 0.78-1.39 -> 0.78\u20131.39, 0-4 -> 0\u20134
@@ -202,7 +239,7 @@ def display_rows(key, rows):
             r[mi] = S9_MODELS.get(r[mi], r[mi])
     out = [head]
     for r in body:
-        out.append([_p(c.strip()) if _is_p(head[n]) else _text(c) for n, c in enumerate(r)])
+        out.append([_p(c.strip()) if _is_p(head[n]) else _text(c, key) for n, c in enumerate(r)])
     return out
 
 

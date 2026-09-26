@@ -234,6 +234,7 @@ def build(key, out_root=Path("submission")):
     line = "Manuscript: Symptom phenotypes and mortality in US cancer survivors: a cohort study."
     assert line in strobe, "STROBE checklist title line changed"
     strobe = strobe.replace(line, f"Manuscript: {title_text}.")
+    strobe = strobe.replace('Title: "a cohort study"', f'Title: "{title_text.split(": ")[-1]}"')
     with tempfile.TemporaryDirectory() as tmp_dir:
         supp = Path(tmp_dir) / "Supplementary_Information.docx" if combined else out / v.get("supp_file", "06_Additional_file_1.docx")
         subprocess.run([sys.executable, "-c",
@@ -264,8 +265,9 @@ def build(key, out_root=Path("submission")):
                 text = fill_strobe_pages.fill(strobe, out / "02_Manuscript.docx", si="Data S1" if v["supp"] == "wiley" else title)
             text = supplementary_wording(text, v["supp"])
             label = {"supplementary": "Supplementary Material 2", "wiley": "Data S2"}.get(v["supp"], "Additional file 2")
-            pandoc(text.replace("# STROBE checklist", f"# {label}. STROBE checklist"),
-                   out / v.get("strobe_file", "07_Additional_file_2_STROBE_checklist.docx"), label)
+            strobe_out = out / v.get("strobe_file", "07_Additional_file_2_STROBE_checklist.docx")
+            pandoc(text.replace("# STROBE checklist", f"# {label}. STROBE checklist"), strobe_out, label)
+            landscape(strobe_out)
     for i, f in enumerate(FIGS, start=3):
         shutil.copy(f, out / f"0{i}_Figure_{i - 2}.png")
     letter = Path("manuscript/cover_letters") / f"{key}.md"
