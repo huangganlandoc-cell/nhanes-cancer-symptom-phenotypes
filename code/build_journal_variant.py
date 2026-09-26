@@ -11,7 +11,7 @@ change to the source propagates everywhere with one command.
 Each variant writes submission/<folder>/manuscript_source.md (the derived markdown, kept for the
 record) plus the Word files, figures and additional files, numbered in upload order.
 """
-import argparse, json, re, shutil, subprocess, sys, tempfile
+import argparse, datetime, json, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -218,14 +218,22 @@ def build(key, out_root=Path("submission")):
     src.write_text(md, encoding="utf-8")
     md = references(md, v["refs"], src)
     combined = v.get("supp_pdf")          # Nature Portfolio wants one supplementary file, preferably PDF
+    title_text = md.split("\n", 1)[0].lstrip("#").strip()   # the variant's own title (e.g. no abbreviations)
     title = {"nature": "Supplementary Information", "supplementary": "Supplementary Material 1",
              "wiley": "Data S1. Supporting Information"}.get(v["supp"],
                                                                                               "Additional file 1")
     prefix = "Supplementary " if combined else ""
-    intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S15 and the STROBE checklist for '
-             'cohort studies, for "Symptom phenotypes and mortality in US cancer survivors: a '
-             'cohort study".') if combined else None
+    if combined:
+        intro = ('Supplementary Figures S1 to S3, Supplementary Tables S1 to S15 and the STROBE checklist for '
+                 f'cohort studies, for "{title_text}".')
+    elif v["supp"] == "wiley":
+        intro = f'Figures S1–S3 and Tables S1–S15 for "{title_text}".'
+    else:
+        intro = f'Supplementary figures S1 to S3 and supplementary tables S1 to S15 for "{title_text}".'
     strobe = Path("supporting/STROBE_checklist_EN.md").read_text(encoding="utf-8")
+    line = "Manuscript: Symptom phenotypes and mortality in US cancer survivors: a cohort study."
+    assert line in strobe, "STROBE checklist title line changed"
+    strobe = strobe.replace(line, f"Manuscript: {title_text}.")
     with tempfile.TemporaryDirectory() as tmp_dir:
         supp = Path(tmp_dir) / "Supplementary_Information.docx" if combined else out / v.get("supp_file", "06_Additional_file_1.docx")
         subprocess.run([sys.executable, "-c",
@@ -264,6 +272,8 @@ def build(key, out_root=Path("submission")):
     if letter.exists():
         body = letter.read_text(encoding="utf-8")
         assert "to be completed" not in body and "to be provided" not in body, f"{letter} still has placeholders"
+        today = datetime.date.today()
+        body = body.replace("[Date]", f"{today.day} {today:%B %Y}")   # dated when the package is built
         pandoc(body, out / "01_Cover_letter.docx", f"Cover letter - {v['journal']}")
     else:
         print(f"   (no cover letter yet: write {letter})")

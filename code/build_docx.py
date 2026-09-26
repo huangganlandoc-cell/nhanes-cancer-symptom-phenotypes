@@ -138,11 +138,80 @@ def insert_figure(doc, key, legends, label=None):
     caption(doc, label or key, legends.get(key, ''))
 
 
+# ---------------------------------------------------------------- display formatting of table cells
+# The CSVs are analysis outputs and stay as written; only what is printed changes: P values to three decimals
+# (below 0.001 as a x 10^-n), confidence limits joined by an en dash, code-style headers and terms spelled out.
+_SUP = str.maketrans("0123456789-", "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079\u207b")
+_ENOTE = re.compile(r"(?<![\w.])(\d+(?:\.\d+)?)[eE]([-+]?\d+)(?![\w.])")
+HEADERS = {"k": "Classes", "logLik": "Log-likelihood", "entropy": "Entropy", "min_class_pct": "Smallest class (%)",
+           "subgroup": "Subgroup", "events": "Deaths", "p": "P", "p_bh": "BH-adjusted P",
+           "joint_p_phenotype": "Joint P, phenotype", "joint_p_11_indicators": "Joint P, 11 indicators",
+           "Pearson X2": "Pearson \u03c7\u00b2"}
+TABLE_HEADERS = {"Table S2": {"model": "Covariate set", "term": "Phenotype"},
+                 "Table S8": {"": "Indicator"},
+                 "Table S9": {"model": "Model", "term": "Term"}}
+S9_MODELS = {"1 phenotype only": "A. Phenotype only", "2 PHQ-9 continuous only": "B. PHQ-9 score only (linear)",
+             "3 phenotype + PHQ-9 continuous": "C. Phenotype + PHQ-9 score (linear)",
+             "4 phenotype + PHQ-9 spline": "D. Phenotype + PHQ-9 score (spline)",
+             "6 all 11 indicators + phenotype": "E. Phenotype + all 11 indicators"}
+CELL_TEXT = [("I(phq9_score/5)", "PHQ-9 score (per 5 points)"), ("JKn", "jackknife"), ("chi2=", "\u03c7\u00b2 = "),
+             ("kg/m2", "kg/m\u00b2"), ("NH White", "Non-Hispanic White"), ("NH Black", "Non-Hispanic Black"),
+             ("report a sleep complaint", "reported previous sleep trouble"), (">=", "\u2265"), ("<=", "\u2264")]
+
+
+def _sci(x):
+    mant, exp = f"{x:.1e}".split("e")
+    return f"{mant} \u00d7 10{str(int(exp)).translate(_SUP)}"
+
+
+def _is_p(header):
+    return header in ("P", "p", "p_bh") or header.endswith(" P") or header.startswith(("Joint P", "joint_p"))
+
+
+def _p(cell):
+    try:
+        x = float(cell)
+    except ValueError:
+        return cell
+    return _sci(x) if 0 < x < 0.001 else (f"{x:.3f}" if 0 <= x <= 1 else cell)
+
+
+def _text(cell):
+    for a, b in CELL_TEXT:
+        cell = cell.replace(a, b)
+    cell = _ENOTE.sub(lambda m: _sci(float(m.group(0))) if float(m.group(0)) < 0.001 else m.group(0), cell)
+    cell = re.sub(r"(?<=\d) py\b", " person-years", cell)
+    cell = re.sub(r"(?<=\d)-(?=\d)", "\u2013", cell)            # 0.78-1.39 -> 0.78\u20131.39, 0-4 -> 0\u20134
+    cell = re.sub(r"(?<![\w.])nan(?![\w.])", "\u2013", cell)
+    return "\u2013" if cell.strip() == "NA" else cell
+
+
+def display_rows(key, rows):
+    head = [TABLE_HEADERS.get(key, {}).get(h, HEADERS.get(h, h)) for h in rows[0]]
+    body = [list(r) for r in rows[1:]]
+    if key == "Table S2" and {"HR", "lo", "hi"} <= set(rows[0]):   # one "HR (95% CI)" column, as in the other tables
+        i, j, k = (rows[0].index(c) for c in ("HR", "lo", "hi"))
+        for r in body:
+            r[i] = f"{float(r[i]):.2f} ({float(r[j]):.2f}\u2013{float(r[k]):.2f})" if r[i] not in ("", "NA") else r[i]
+        keep = [c for c in range(len(head)) if c not in (j, k)]
+        head = ["HR (95% CI)" if c == i else head[c] for c in keep]
+        body = [[r[c] for c in keep] for r in body]
+    if key == "Table S9":
+        mi = rows[0].index("model")
+        for r in body:
+            r[mi] = S9_MODELS.get(r[mi], r[mi])
+    out = [head]
+    for r in body:
+        out.append([_p(c.strip()) if _is_p(head[n]) else _text(c) for n, c in enumerate(r)])
+    return out
+
+
 def insert_table(doc, key, legends, label=None):
     with open(TBL_FILES[key], newline='', encoding='utf-8') as fh:
         rows = list(csv.reader(fh))
     if not rows:
         return
+    rows = display_rows(key, rows)
     caption(doc, label or key, legends.get(key, ''))
     ncol = len(rows[0])
     size = 7.5 if ncol <= 7 else 7.0                 # wide tables (e.g. Table 2, nine columns) a little smaller
@@ -161,8 +230,7 @@ def insert_table(doc, key, legends, label=None):
         for j, cell in enumerate(row):
             c = t.cell(i, j); c.text = ''
             p = c.paragraphs[0]
-            r = p.add_run('' if cell in ('nan', 'None') else cell)
-            r.font.size = Pt(size)
+            add_runs(p, '' if cell in ('nan', 'None') else cell, base=size)   # x 10^-n as real superscript
             p.paragraph_format.space_after = Pt(0)
     # column widths: numeric columns (HR, P) and very short ones get the width of their longest cell so they
     # never wrap; text columns share what is left in proportion to their length, never below their longest word

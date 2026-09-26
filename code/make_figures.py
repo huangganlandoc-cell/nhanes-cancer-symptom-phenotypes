@@ -61,10 +61,11 @@ km["lca"] = km["lca"].replace(RN)
 sg["ph"] = sg.term.str.replace("lca", "", regex=False).replace(RN)
 
 # ------------------------------------------------------------------ Figure 1
-pf["item"] = pf["item"].replace({"Insomnia complaint": "Ever reported sleep trouble"})
+pf["item"] = pf["item"].replace({"Insomnia complaint": "Previously reported sleep trouble",   # SLQ050, as in Methods
+                                 "Long sleep (>=9 h)": "Long sleep (≥9 h)"})
 order = ["Anhedonia", "Depressed mood", "Worthlessness", "Concentration", "Psychomotor change",
          "Suicidal ideation", "Appetite change", "Fatigue", "Sleep disturbance",
-         "Short sleep (<6 h)", "Long sleep (>=9 h)", "Ever reported sleep trouble"]
+         "Short sleep (<6 h)", "Long sleep (≥9 h)", "Previously reported sleep trouble"]
 PV = {r["class"]: (r.weighted_pct, r.lo, r.hi) for _, r in pv.iterrows()}
 
 fig1, axes = plt.subplots(1, 2, figsize=(7.2, 4.0), gridspec_kw={"width_ratios": [2.4, 1], "wspace": 0.42})
@@ -162,7 +163,7 @@ ax.set_xscale("log"); ax.set_xticks([0.5, 1, 2, 4, 8])
 ax.xaxis.set_major_formatter(mtick.FixedFormatter(["0.5", "1", "2", "4", "8"]))
 ax.xaxis.set_minor_locator(mtick.NullLocator()); ax.set_xlim(*XS2)
 ax.set_yticks(list(range(len(SGO))))
-ax.set_yticklabels([f"{s}  (n={int(sgb[sgb.subgroup == s].n.iloc[0]):,}, {int(sgb[sgb.subgroup == s].events.iloc[0])} deaths)"
+ax.set_yticklabels([f"{s.replace('>=', '≥').replace(' dx', ' diagnosis')}  (n={int(sgb[sgb.subgroup == s].n.iloc[0]):,}, {int(sgb[sgb.subgroup == s].events.iloc[0])} deaths)"
                     for s in SGO[::-1]])
 ax.set_ylim(-0.75, len(SGO) - 0.25)
 ax.set_xlabel("Hazard ratio for all-cause death (95% CI)")
