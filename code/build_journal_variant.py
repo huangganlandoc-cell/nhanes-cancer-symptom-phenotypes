@@ -254,9 +254,14 @@ def build(key, out_root=Path("submission")):
                    checklist, "STROBE checklist")
             landscape(checklist)
             writer = PdfWriter()
-            for f in (to_pdf(supp, tmp_dir), to_pdf(checklist, tmp_dir)):
+            parts = [to_pdf(supp, tmp_dir), to_pdf(checklist, tmp_dir)]
+            for f in parts:
                 writer.append(str(f))
-            writer.add_metadata({"/Title": "06_Supplementary_Information", "/Author": "Yongyong Bao"})
+            from pypdf import PdfReader
+            src_meta = PdfReader(str(parts[0])).metadata or {}   # the pages are LibreOffice's; the merge adds none
+            writer.add_metadata({"/Title": "06_Supplementary_Information", "/Author": "Yongyong Bao",
+                                 "/Producer": src_meta.get("/Producer") or "LibreOffice",
+                                 "/Creator": src_meta.get("/Creator") or "Writer"})
             writer.write(str(out / "06_Supplementary_Information.pdf")); writer.close()
         else:
             import fill_strobe_pages
